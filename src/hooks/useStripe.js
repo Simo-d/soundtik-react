@@ -5,8 +5,9 @@ import { logPayment } from '../firebase/analytics';
 
 // Initialize Stripe with the public key
 // Note: In production, use an environment variable
-const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLIC_KEY);
-
+const stripePromise = process.env.REACT_APP_STRIPE_PUBLIC_KEY 
+  ? loadStripe(process.env.REACT_APP_STRIPE_PUBLIC_KEY) 
+  : null;
 /**
  * Custom hook for Stripe payment integration
  * @returns {Object} Stripe methods and state

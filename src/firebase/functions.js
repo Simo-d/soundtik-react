@@ -2,58 +2,6 @@ import { httpsCallable } from 'firebase/functions';
 import { functions } from './config';
 
 /**
- * Create a payment intent with Stripe
- * @param {string} campaignId - Campaign ID
- * @param {number} amount - Payment amount in dollars
- * @returns {Promise<Object>} - Contains client_secret for the payment
- */
-export const createPaymentIntent = async (campaignId, amount) => {
-  try {
-    const createPaymentIntentFunc = httpsCallable(functions, 'createPaymentIntent');
-    const result = await createPaymentIntentFunc({ campaignId, amount });
-    return result.data;
-  } catch (error) {
-    console.error('Error creating payment intent:', error);
-    throw error;
-  }
-};
-
-/**
- * Handle successful payment
- * @param {string} campaignId - Campaign ID
- * @param {string} paymentIntentId - Stripe Payment Intent ID
- * @returns {Promise<Object>} - Result data
- */
-export const handlePaymentSuccess = async (campaignId, paymentIntentId) => {
-  try {
-    const handlePaymentSuccessFunc = httpsCallable(functions, 'handlePaymentSuccess');
-    const result = await handlePaymentSuccessFunc({ campaignId, paymentIntentId });
-    return result.data;
-  } catch (error) {
-    console.error('Error handling payment success:', error);
-    throw error;
-  }
-};
-
-/**
- * Handle failed payment
- * @param {string} campaignId - Campaign ID
- * @param {string} paymentIntentId - Stripe Payment Intent ID
- * @param {string} errorMessage - Error message
- * @returns {Promise<Object>} - Result data
- */
-export const handlePaymentFailure = async (campaignId, paymentIntentId, errorMessage) => {
-  try {
-    const handlePaymentFailureFunc = httpsCallable(functions, 'handlePaymentFailure');
-    const result = await handlePaymentFailureFunc({ campaignId, paymentIntentId, errorMessage });
-    return result.data;
-  } catch (error) {
-    console.error('Error handling payment failure:', error);
-    throw error;
-  }
-};
-
-/**
  * Submit campaign for admin validation
  * @param {string} campaignId - Campaign ID
  * @returns {Promise<Object>} - Result data
@@ -88,34 +36,62 @@ export const validateCampaign = async (campaignId, isApproved, notes = '') => {
 };
 
 /**
- * Fetch campaign metrics from TikTok
- * @param {string} campaignId - Campaign ID
- * @returns {Promise<Object>} - Result data with metrics
+ * For now, we'll use placeholders for these functions
+ * In a real app, these would call actual cloud functions
  */
-export const fetchTikTokMetrics = async (campaignId) => {
-  try {
-    const fetchMetricsFunc = httpsCallable(functions, 'fetchTikTokMetrics');
-    const result = await fetchMetricsFunc({ campaignId });
-    return result.data;
-  } catch (error) {
-    console.error('Error fetching TikTok metrics:', error);
-    throw error;
-  }
+
+export const createPaymentIntent = async (campaignId, amount) => {
+  console.log('Creating payment intent for', campaignId, 'with amount', amount);
+  // Mock response
+  return {
+    clientSecret: 'mock_client_secret_' + Math.random().toString(36).substring(2, 15)
+  };
 };
 
-/**
- * Process audio file for TikTok campaign
- * @param {string} campaignId - Campaign ID
- * @param {string} audioUrl - URL of the audio file
- * @returns {Promise<Object>} - Result data
- */
+export const handlePaymentSuccess = async (campaignId, paymentIntentId) => {
+  console.log('Payment success for', campaignId, 'with intent', paymentIntentId);
+  return { success: true };
+};
+
+export const handlePaymentFailure = async (campaignId, paymentIntentId, errorMessage) => {
+  console.log('Payment failure for', campaignId, 'with intent', paymentIntentId, ':', errorMessage);
+  return { success: false };
+};
+
+export const fetchTikTokMetrics = async (campaignId) => {
+  console.log('Fetching metrics for', campaignId);
+  // Mock response with sample metrics
+  return {
+    summary: {
+      views: 25000 + Math.floor(Math.random() * 10000),
+      likes: 2500 + Math.floor(Math.random() * 1000),
+      comments: 500 + Math.floor(Math.random() * 200),
+      shares: 800 + Math.floor(Math.random() * 300),
+      follows: 300 + Math.floor(Math.random() * 100),
+      engagement: 8.5 + (Math.random() * 3 - 1.5)
+    },
+    dailyMetrics: Array.from({ length: 7 }, (_, i) => ({
+      date: new Date(Date.now() - (6 - i) * 86400000),
+      views: 2000 + Math.floor(Math.random() * 3000),
+      likes: 200 + Math.floor(Math.random() * 300),
+      comments: 50 + Math.floor(Math.random() * 50),
+      shares: 80 + Math.floor(Math.random() * 70),
+      newFollowers: 30 + Math.floor(Math.random() * 20)
+    }))
+  };
+};
+
 export const processAudio = async (campaignId, audioUrl) => {
-  try {
-    const processAudioFunc = httpsCallable(functions, 'processAudioFile');
-    const result = await processAudioFunc({ campaignId, audioUrl });
-    return result.data;
-  } catch (error) {
-    console.error('Error processing audio file:', error);
-    throw error;
-  }
+  console.log('Processing audio for', campaignId, ':', audioUrl);
+  return { success: true };
+};
+
+export default {
+  submitCampaignForValidation,
+  validateCampaign,
+  createPaymentIntent,
+  handlePaymentSuccess,
+  handlePaymentFailure,
+  fetchTikTokMetrics,
+  processAudio
 };

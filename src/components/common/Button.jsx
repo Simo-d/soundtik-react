@@ -16,50 +16,33 @@ const Button = ({
   className = '',
   ...rest
 }) => {
-  // Determine button class based on variant
-  const getVariantClass = () => {
-    switch (variant) {
-      case 'primary':
-        return 'bg-primary text-white hover:bg-primary-light';
-      case 'secondary':
-        return 'bg-secondary text-black hover:bg-secondary-dark';
-      case 'outline':
-        return 'bg-transparent border border-primary text-primary hover:bg-primary hover:text-white';
-      case 'text':
-        return 'bg-transparent text-primary hover:underline';
-      case 'success':
-        return 'bg-success text-white hover:bg-success-dark';
-      case 'danger':
-        return 'bg-error text-white hover:bg-error-dark';
-      default:
-        return 'bg-primary text-white hover:bg-primary-light';
-    }
+  // Base button classes
+  const baseClasses = "font-medium rounded focus:outline-none transition-all duration-200";
+  
+  // Variant specific classes
+  const variantClasses = {
+    primary: "bg-primary text-white hover:bg-primary-light",
+    secondary: "bg-secondary text-black hover:bg-secondary-dark",
+    outline: "bg-transparent border border-primary text-primary hover:bg-primary hover:text-white",
+    text: "bg-transparent text-primary hover:underline",
+    success: "bg-success text-white hover:bg-success-dark",
+    danger: "bg-error text-white hover:bg-error-dark"
   };
-
-  // Determine button size class
-  const getSizeClass = () => {
-    switch (size) {
-      case 'small':
-        return 'py-1 px-3 text-sm';
-      case 'medium':
-        return 'py-2 px-4 text-base';
-      case 'large':
-        return 'py-3 px-6 text-lg';
-      default:
-        return 'py-2 px-4 text-base';
-    }
+  
+  // Size specific classes
+  const sizeClasses = {
+    small: "py-1 px-3 text-sm",
+    medium: "py-2 px-4 text-base",
+    large: "py-3 px-6 text-lg"
   };
-
+  
+  // Combine all classes
   const buttonClasses = `
-    btn
-    ${getVariantClass()}
-    ${getSizeClass()}
+    ${baseClasses}
+    ${variantClasses[variant] || variantClasses.primary}
+    ${sizeClasses[size] || sizeClasses.medium}
     ${fullWidth ? 'w-full' : ''}
     ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
-    rounded
-    font-medium
-    transition-all
-    duration-200
     ${className}
   `;
 
@@ -84,7 +67,7 @@ Button.propTypes = {
   fullWidth: PropTypes.bool,
   disabled: PropTypes.bool,
   onClick: PropTypes.func,
-  className: PropTypes.string,
+  className: PropTypes.string
 };
 
 export default Button;

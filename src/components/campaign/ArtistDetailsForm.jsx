@@ -1,17 +1,14 @@
 import React, { useState } from 'react';
 import { useFormContext } from '../../contexts/FormContext';
-import { useStorage } from '../../hooks/useStorage';
 import { logFormStepComplete } from '../../firebase/analytics';
 import Input from '../common/Input';
-import FileUpload from '../common/FileUpload';
 import Button from '../common/Button';
 
 /**
  * Artist details form component - second step of campaign creation
  */
 const ArtistDetailsForm = ({ onNext, onBack }) => {
-  const { formData, updateFormData, updateNestedFormData, errors, validateStep } = useFormContext();
-  const { uploadImageFile, uploadFile, progress, loading } = useStorage();
+  const { formData, updateFormData, updateNestedFormData, errors } = useFormContext();
   
   // Local state for form handling
   const [localErrors, setLocalErrors] = useState({});
@@ -35,32 +32,6 @@ const ArtistDetailsForm = ({ onNext, onBack }) => {
     // Clear local error when user types
     if (localErrors[`socialLinks.${name}`]) {
       setLocalErrors(prev => ({ ...prev, [`socialLinks.${name}`]: '' }));
-    }
-  };
-
-  // Handle press kit upload
-  const handlePressKitUpload = async (files) => {
-    if (!files || files.length === 0) return;
-    
-    try {
-      const file = files[0];
-      // For press kit, we'll accept PDF, DOC, DOCX formats
-      const pressKitUrl = await uploadFile(file, `pressKits/${file.name}`);
-      
-      if (pressKitUrl) {
-        updateFormData('artistDetails', { pressKit: pressKitUrl });
-        
-        // Clear local error
-        if (localErrors.pressKit) {
-          setLocalErrors(prev => ({ ...prev, pressKit: '' }));
-        }
-      }
-    } catch (error) {
-      console.error('Press kit upload error:', error);
-      setLocalErrors(prev => ({ 
-        ...prev, 
-        pressKit: 'Failed to upload press kit. Please try again.' 
-      }));
     }
   };
 
@@ -158,7 +129,7 @@ const ArtistDetailsForm = ({ onNext, onBack }) => {
           <h3 className="text-lg font-medium mb-2">Social Media Links</h3>
           
           <Input
-            type="text"
+            type="url"
             id="instagram"
             name="instagram"
             label="Instagram"
@@ -170,7 +141,7 @@ const ArtistDetailsForm = ({ onNext, onBack }) => {
           />
           
           <Input
-            type="text"
+            type="url"
             id="tiktok"
             name="tiktok"
             label="TikTok"
@@ -182,7 +153,7 @@ const ArtistDetailsForm = ({ onNext, onBack }) => {
           />
           
           <Input
-            type="text"
+            type="url"
             id="spotify"
             name="spotify"
             label="Spotify"
@@ -194,7 +165,7 @@ const ArtistDetailsForm = ({ onNext, onBack }) => {
           />
           
           <Input
-            type="text"
+            type="url"
             id="youtube"
             name="youtube"
             label="YouTube"
@@ -206,19 +177,18 @@ const ArtistDetailsForm = ({ onNext, onBack }) => {
           />
         </div>
         
-        {/* Press Kit Upload */}
-        <FileUpload
-          accept=".pdf,.doc,.docx"
+        {/* Press Kit Link */}
+        <Input
+          type="url"
           id="pressKit"
           name="pressKit"
-          label="Upload Press Kit (Optional)"
-          onChange={handlePressKitUpload}
+          label="Press Kit Link (Optional)"
+          value={formData.artistDetails.pressKit}
+          onChange={handleChange}
           error={localErrors.pressKit}
+          placeholder="https://yourwebsite.com/press-kit"
+          helperText="Link to your press kit or EPK"
           className="mb-6"
-          uploading={loading}
-          progress={progress}
-          maxSize={10} // 10MB max
-          helperText="Upload your press kit in PDF, DOC, or DOCX format (10MB max)"
         />
         
         {/* Navigation Buttons */}
@@ -234,9 +204,8 @@ const ArtistDetailsForm = ({ onNext, onBack }) => {
           <Button
             type="submit"
             variant="primary"
-            disabled={loading}
           >
-            {loading ? 'Uploading...' : 'Next: Campaign Details'}
+            Next: Campaign Details
           </Button>
         </div>
       </form>

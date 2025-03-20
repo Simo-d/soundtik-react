@@ -8,7 +8,9 @@ import { analytics } from './config';
  */
 export const logCustomEvent = (eventName, eventParams = {}) => {
   try {
-    logEvent(analytics, eventName, eventParams);
+    if (analytics) {
+      logEvent(analytics, eventName, eventParams);
+    }
   } catch (error) {
     console.error('Error logging event:', error);
   }
@@ -21,12 +23,14 @@ export const logCustomEvent = (eventName, eventParams = {}) => {
  */
 export const logPageView = (pageName, additionalParams = {}) => {
   try {
-    logEvent(analytics, 'page_view', {
-      page_title: pageName,
-      page_location: window.location.href,
-      page_path: window.location.pathname,
-      ...additionalParams
-    });
+    if (analytics) {
+      logEvent(analytics, 'page_view', {
+        page_title: pageName,
+        page_location: window.location.href,
+        page_path: window.location.pathname,
+        ...additionalParams
+      });
+    }
   } catch (error) {
     console.error('Error logging page view:', error);
   }
@@ -38,7 +42,9 @@ export const logPageView = (pageName, additionalParams = {}) => {
  */
 export const logLogin = (method) => {
   try {
-    logEvent(analytics, 'login', { method });
+    if (analytics) {
+      logEvent(analytics, 'login', { method });
+    }
   } catch (error) {
     console.error('Error logging login:', error);
   }
@@ -50,7 +56,9 @@ export const logLogin = (method) => {
  */
 export const logSignUp = (method) => {
   try {
-    logEvent(analytics, 'sign_up', { method });
+    if (analytics) {
+      logEvent(analytics, 'sign_up', { method });
+    }
   } catch (error) {
     console.error('Error logging sign up:', error);
   }
@@ -63,12 +71,14 @@ export const logSignUp = (method) => {
  */
 export const logCampaignCreation = (campaignId, campaignData) => {
   try {
-    logEvent(analytics, 'campaign_created', {
-      campaign_id: campaignId,
-      genre: campaignData.songDetails?.genre || '',
-      budget: campaignData.campaignDetails?.budget || 0,
-      duration: campaignData.campaignDetails?.duration || 0
-    });
+    if (analytics) {
+      logEvent(analytics, 'campaign_created', {
+        campaign_id: campaignId,
+        genre: campaignData.songDetails?.genre || '',
+        budget: campaignData.campaignDetails?.budget || 0,
+        duration: campaignData.campaignDetails?.duration || 0
+      });
+    }
   } catch (error) {
     console.error('Error logging campaign creation:', error);
   }
@@ -80,7 +90,9 @@ export const logCampaignCreation = (campaignId, campaignData) => {
  */
 export const logCampaignSubmission = (campaignId) => {
   try {
-    logEvent(analytics, 'campaign_submitted', { campaign_id: campaignId });
+    if (analytics) {
+      logEvent(analytics, 'campaign_submitted', { campaign_id: campaignId });
+    }
   } catch (error) {
     console.error('Error logging campaign submission:', error);
   }
@@ -94,12 +106,14 @@ export const logCampaignSubmission = (campaignId) => {
  */
 export const logPayment = (campaignId, amount, currency = 'USD') => {
   try {
-    logEvent(analytics, 'purchase', {
-      transaction_id: campaignId,
-      value: amount,
-      currency,
-      items: [{ item_id: campaignId, item_name: 'TikTok Promotion Campaign' }]
-    });
+    if (analytics) {
+      logEvent(analytics, 'purchase', {
+        transaction_id: campaignId,
+        value: amount,
+        currency,
+        items: [{ item_id: campaignId, item_name: 'TikTok Promotion Campaign' }]
+      });
+    }
   } catch (error) {
     console.error('Error logging payment:', error);
   }
@@ -113,11 +127,13 @@ export const logPayment = (campaignId, amount, currency = 'USD') => {
  */
 export const logFormStepComplete = (formName, stepNumber, stepName) => {
   try {
-    logEvent(analytics, 'form_step_complete', {
-      form_name: formName,
-      step_number: stepNumber,
-      step_name: stepName
-    });
+    if (analytics) {
+      logEvent(analytics, 'form_step_complete', {
+        form_name: formName,
+        step_number: stepNumber,
+        step_name: stepName
+      });
+    }
   } catch (error) {
     console.error('Error logging form step completion:', error);
   }
@@ -130,11 +146,25 @@ export const logFormStepComplete = (formName, stepNumber, stepName) => {
  */
 export const trackFeatureUsage = (featureName, additionalParams = {}) => {
   try {
-    logEvent(analytics, 'feature_use', {
-      feature_name: featureName,
-      ...additionalParams
-    });
+    if (analytics) {
+      logEvent(analytics, 'feature_use', {
+        feature_name: featureName,
+        ...additionalParams
+      });
+    }
   } catch (error) {
     console.error('Error tracking feature usage:', error);
   }
+};
+
+export default {
+  logCustomEvent,
+  logPageView,
+  logLogin,
+  logSignUp,
+  logCampaignCreation,
+  logCampaignSubmission,
+  logPayment,
+  logFormStepComplete,
+  trackFeatureUsage
 };

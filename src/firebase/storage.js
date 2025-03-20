@@ -1,96 +1,83 @@
-import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
-import { storage } from './config';
+/**
+ * This file usually handles Firebase Storage operations
+ * Since we're not using Firebase Storage, we'll adapt it to work with external URLs
+ */
 
 /**
- * Upload a file to Firebase Storage with progress tracking
- * @param {File} file - The file to upload
- * @param {string} path - Storage path including filename
- * @param {Function} progressCallback - Optional callback for upload progress
- * @returns {Promise<string>} - Download URL of the uploaded file
+ * "Upload" a file (mock function that just returns a URL)
+ * @param {File} file - The file to "upload"
+ * @param {string} path - Unused parameter
+ * @param {Function} progressCallback - Optional callback for mock upload progress
+ * @returns {Promise<string>} - Mock URL for the "uploaded" file
  */
 export const uploadFile = (file, path, progressCallback = null) => {
-  return new Promise((resolve, reject) => {
-    // Create storage reference
-    const storageRef = ref(storage, path);
-    const uploadTask = uploadBytesResumable(storageRef, file);
-    
-    // Listen for state changes, errors, and completion
-    uploadTask.on(
-      'state_changed',
-      (snapshot) => {
-        // Get upload progress
-        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-        console.log('Upload is ' + progress + '% done');
-        
-        if (progressCallback) {
-          progressCallback(progress);
+  return new Promise((resolve) => {
+    // Simulate upload progress
+    if (progressCallback) {
+      let progress = 0;
+      const interval = setInterval(() => {
+        progress += 10;
+        progressCallback(progress);
+        if (progress >= 100) {
+          clearInterval(interval);
         }
-      },
-      (error) => {
-        // Handle errors
-        console.error('Upload error:', error);
-        reject(error);
-      },
-      async () => {
-        // Upload completed successfully
-        try {
-          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-          resolve(downloadURL);
-        } catch (err) {
-          reject(err);
-        }
+      }, 300);
+    }
+
+    // Instead of uploading, generate a mock URL or use a placeholder
+    setTimeout(() => {
+      // For images we'll use a placeholder service
+      if (file.type.startsWith('image/')) {
+        resolve(`https://via.placeholder.com/300x300?text=${encodeURIComponent(file.name)}`);
+      } 
+      // For audio we'll use a mock audio URL
+      else if (file.type.startsWith('audio/')) {
+        resolve('https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3');
       }
-    );
+      // For other file types
+      else {
+        resolve(`https://example.com/mock-file/${encodeURIComponent(file.name)}`);
+      }
+    }, 3000); // Simulate 3 second upload time
   });
 };
 
 /**
- * Upload an audio file
- * @param {File} file - The audio file to upload
+ * Upload an audio file (mock)
+ * @param {File} file - The audio file to "upload"
  * @param {string} userId - User ID for path organization
  * @param {Function} progressCallback - Optional callback for upload progress
- * @returns {Promise<string>} - Download URL of the uploaded audio file
+ * @returns {Promise<string>} - Mock URL for the "uploaded" audio file
  */
 export const uploadAudio = (file, userId, progressCallback = null) => {
-  // Generate unique filename to avoid collisions
+  // Generate a mock filename
   const filename = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
   const path = `audio/${userId}/${filename}`;
   return uploadFile(file, path, progressCallback);
 };
 
 /**
- * Upload an image file
- * @param {File} file - The image file to upload
+ * Upload an image file (mock)
+ * @param {File} file - The image file to "upload"
  * @param {string} userId - User ID for path organization
  * @param {Function} progressCallback - Optional callback for upload progress
- * @returns {Promise<string>} - Download URL of the uploaded image file
+ * @returns {Promise<string>} - Mock URL for the "uploaded" image file
  */
 export const uploadImage = (file, userId, progressCallback = null) => {
-  // Generate unique filename to avoid collisions
+  // Generate a mock filename
   const filename = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
   const path = `images/${userId}/${filename}`;
   return uploadFile(file, path, progressCallback);
 };
 
 /**
- * Delete a file from Firebase Storage
+ * Delete a file (mock)
  * @param {string} downloadURL - The download URL of the file to delete
  * @returns {Promise<void>}
  */
-export const deleteFile = async (downloadURL) => {
-  try {
-    // Extract the path from the URL
-    const url = new URL(downloadURL);
-    const path = decodeURIComponent(url.pathname.split('/o/')[1]).split('?')[0];
-    
-    // Create reference and delete the file
-    const fileRef = ref(storage, path);
-    await deleteObject(fileRef);
-    console.log('File deleted successfully');
-  } catch (error) {
-    console.error('Error deleting file:', error);
-    throw error;
-  }
+export const deleteFile = async () => {
+  // This is a mock function, so we just return after a short delay
+  return new Promise(resolve => setTimeout(resolve, 500));
 };
 
 /**

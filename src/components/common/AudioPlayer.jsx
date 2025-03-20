@@ -22,34 +22,78 @@ const AudioPlayer = ({
   const [currentTime, setCurrentTime] = useState(0);
   const [volume, setVolume] = useState(1);
   const [isMuted, setIsMuted] = useState(false);
+  const [error, setError] = useState(null);
   
   const audioRef = useRef(null);
   const progressBarRef = useRef(null);
 
+  // Load audio and handle errors
+  useEffect(() => {
+    if (!src) return;
+    
+    const audio = audioRef.current;
+    if (!audio) return;
+    
+    // Reset state
+    setError(null);
+    setCurrentTime(0);
+    setDuration(0);
+    setIsPlaying(false);
+    
+    // Handle errors
+    const handleError = () => {
+      setError('Could not load audio. Please check the URL and try again.');
+      setIsPlaying(false);
+    };
+    
+    audio.addEventListener('error', handleError);
+    
+    return () => {
+      audio.removeEventListener('error', handleError);
+    };
+  }, [src]);
+
   // Handle audio metadata loaded
   const handleLoadedMetadata = () => {
-    setDuration(audioRef.current.duration);
+    if (audioRef.current) {
+      setDuration(audioRef.current.duration);
+    }
   };
 
   // Handle time update
   const handleTimeUpdate = () => {
-    setCurrentTime(audioRef.current.currentTime);
+    if (audioRef.current) {
+      setCurrentTime(audioRef.current.currentTime);
+    }
   };
 
   // Toggle play/pause
   const togglePlay = () => {
+    if (!audioRef.current) return;
+    
     if (isPlaying) {
       audioRef.current.pause();
       if (onPause) onPause();
     } else {
-      audioRef.current.play();
-      if (onPlay) onPlay();
+      const playPromise = audioRef.current.play();
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            if (onPlay) onPlay();
+          })
+          .catch(err => {
+            console.error('Playback error:', err);
+            setError('Playback failed. This might be due to autoplay restrictions.');
+          });
+      }
     }
     setIsPlaying(!isPlaying);
   };
 
   // Handle progress bar click
   const handleProgressChange = (e) => {
+    if (!audioRef.current || !progressBarRef.current) return;
+    
     const progressBar = progressBarRef.current;
     const rect = progressBar.getBoundingClientRect();
     const pos = (e.clientX - rect.left) / progressBar.offsetWidth;
@@ -60,12 +104,16 @@ const AudioPlayer = ({
   const handleVolumeChange = (e) => {
     const value = parseFloat(e.target.value);
     setVolume(value);
-    audioRef.current.volume = value;
+    if (audioRef.current) {
+      audioRef.current.volume = value;
+    }
     setIsMuted(value === 0);
   };
 
   // Toggle mute
   const toggleMute = () => {
+    if (!audioRef.current) return;
+    
     if (isMuted) {
       audioRef.current.volume = volume || 1;
       setIsMuted(false);
@@ -99,7 +147,7 @@ const AudioPlayer = ({
 
   // Set up autoplay if enabled
   useEffect(() => {
-    if (autoPlay && audioRef.current) {
+    if (autoPlay && audioRef.current && src) {
       audioRef.current.play()
         .then(() => {
           setIsPlaying(true);
@@ -107,9 +155,10 @@ const AudioPlayer = ({
         })
         .catch(error => {
           console.error('Autoplay prevented:', error);
+          setError('Autoplay was prevented by the browser. Click play to listen.');
         });
     }
-  }, [autoPlay, onPlay]);
+  }, [autoPlay, onPlay, src]);
 
   return (
     <div className={`audio-player rounded-lg bg-white shadow p-4 ${className}`}>
@@ -149,12 +198,20 @@ const AudioPlayer = ({
             className="hidden"
           />
           
+          {/* Error Message */}
+          {error && (
+            <div className="mb-2 text-error text-sm">
+              {error}
+            </div>
+          )}
+          
           {/* Controls */}
           <div className="flex items-center">
             <button 
               onClick={togglePlay}
               className="mr-2 text-primary focus:outline-none hover:text-primary-light transition-colors"
               aria-label={isPlaying ? 'Pause' : 'Play'}
+              disabled={!src}
             >
               {isPlaying ? (
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -176,7 +233,7 @@ const AudioPlayer = ({
               >
                 <div 
                   className="h-full bg-primary rounded-full transition-all duration-100"
-                  style={{ width: `${(currentTime / duration) * 100}%` }}
+                  style={{ width: `${duration > 0 ? (currentTime / duration) * 100 : 0}%` }}
                 ></div>
               </div>
               <div className="flex justify-between text-xs text-gray-500 mt-1">
@@ -210,7 +267,8 @@ const AudioPlayer = ({
                 step="0.01"
                 value={isMuted ? 0 : volume}
                 onChange={handleVolumeChange}
-                className="w-16 h-1 accent-primary"
+                className="w-16 h-1"
+                style={{ accentColor: '#6200EA' }}
               />
             </div>
           </div>

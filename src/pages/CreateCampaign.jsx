@@ -12,8 +12,9 @@ import BudgetSelector from '../components/campaign/BudgetSelector';
 import PaymentForm from '../components/campaign/PaymentForm';
 
 // Initialize Stripe with the public key
-const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLIC_KEY);
-
+const stripePromise = process.env.REACT_APP_STRIPE_PUBLIC_KEY 
+  ? loadStripe(process.env.REACT_APP_STRIPE_PUBLIC_KEY) 
+  : null;
 /**
  * Create Campaign page - multi-step form for campaign creation
  */

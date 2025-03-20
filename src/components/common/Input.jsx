@@ -1,12 +1,11 @@
-import React, { forwardRef } from 'react';
+import React from 'react';
 import PropTypes from 'prop-types';
 
 /**
  * Reusable Input component
  * @param {Object} props - Component props
- * @param {React.Ref} ref - Forwarded ref
  */
-const Input = forwardRef(({
+const Input = ({
   type = 'text',
   id,
   name,
@@ -26,75 +25,92 @@ const Input = forwardRef(({
   max,
   step,
   ...rest
-}, ref) => {
+}) => {
+  // Determine if the input is multiline (textarea)
+  const isMultiline = type === 'textarea';
+  
   // Base input classes
   const inputClasses = `
-    form-input
-    w-full
-    px-3
-    py-2
-    border
-    rounded
-    focus:outline-none
-    focus:ring-2
-    focus:ring-primary
-    focus:border-transparent
-    transition
+    w-full 
+    px-3 
+    py-2 
+    border 
+    rounded 
+    focus:outline-none 
+    focus:ring-2 
+    focus:ring-primary 
+    focus:border-transparent 
+    transition 
     duration-200
-    ${error ? 'border-error' : 'border-gray-300'}
+    ${error ? 'border-red-500' : 'border-gray-300'}
     ${disabled ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'}
     ${inputClassName}
   `;
 
   return (
-    <div className={`form-group ${className}`}>
+    <div className={`mb-4 ${className}`}>
       {label && (
         <label 
           htmlFor={id} 
           className={`block mb-1 font-medium ${labelClassName}`}
         >
           {label}
-          {required && <span className="text-error ml-1">*</span>}
+          {required && <span className="text-red-500 ml-1">*</span>}
         </label>
       )}
       
-      <input
-        ref={ref}
-        type={type}
-        id={id}
-        name={name}
-        value={value}
-        onChange={onChange}
-        onBlur={onBlur}
-        placeholder={placeholder}
-        disabled={disabled}
-        required={required}
-        className={inputClasses}
-        min={min}
-        max={max}
-        step={step}
-        {...rest}
-      />
+      {isMultiline ? (
+        <textarea
+          id={id}
+          name={name}
+          value={value}
+          onChange={onChange}
+          onBlur={onBlur}
+          placeholder={placeholder}
+          disabled={disabled}
+          required={required}
+          className={inputClasses}
+          rows={rest.rows || 4}
+          {...rest}
+        />
+      ) : (
+        <input
+          type={type}
+          id={id}
+          name={name}
+          value={value}
+          onChange={onChange}
+          onBlur={onBlur}
+          placeholder={placeholder}
+          disabled={disabled}
+          required={required}
+          className={inputClasses}
+          min={min}
+          max={max}
+          step={step}
+          {...rest}
+        />
+      )}
       
       {(error || helperText) && (
-        <div className={`mt-1 text-sm ${error ? 'text-error' : 'text-gray-500'}`}>
+        <div className={`mt-1 text-sm ${error ? 'text-red-500' : 'text-gray-500'}`}>
           {error || helperText}
         </div>
       )}
     </div>
   );
-});
+};
 
 Input.propTypes = {
   type: PropTypes.string,
   id: PropTypes.string,
-  name: PropTypes.string.isRequired,
+  name: PropTypes.string,
   label: PropTypes.string,
   value: PropTypes.oneOfType([
     PropTypes.string,
     PropTypes.number
   ]),
-  onChange: PropTypes.func.isRequired,
+  onChange: PropTypes.func,
   onBlur: PropTypes.func,
   placeholder: PropTypes.string,
   error: PropTypes.string,
@@ -107,8 +123,7 @@ Input.propTypes = {
   min: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
   max: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
   step: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
+  rows: PropTypes.number
 };
-
-Input.displayName = 'Input';
 
 export default Input;

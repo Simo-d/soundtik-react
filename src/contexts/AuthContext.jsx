@@ -26,18 +26,29 @@ export const AuthProvider = ({ children }) => {
       
       if (user) {
         try {
-          // Get user profile from Firestore
-          const docRef = doc(db, 'users', user.uid);
-          const docSnap = await getDoc(docRef);
-          
-          if (docSnap.exists()) {
-            const userData = docSnap.data();
-            setUserProfile(userData);
-            setIsAdmin(userData.role === 'admin');
+          // Check if user is the hardcoded admin
+          if (user.email === 'admin@soundtik.com') {
+            // This user is always an admin
+            setUserProfile({
+              displayName: 'Admin User',
+              email: user.email,
+              role: 'admin'
+            });
+            setIsAdmin(true);
           } else {
-            console.log('No user profile found in Firestore');
-            setUserProfile(null);
-            setIsAdmin(false);
+            // Get regular user profile from Firestore
+            const docRef = doc(db, 'users', user.uid);
+            const docSnap = await getDoc(docRef);
+            
+            if (docSnap.exists()) {
+              const userData = docSnap.data();
+              setUserProfile(userData);
+              setIsAdmin(userData.role === 'admin');
+            } else {
+              console.log('No user profile found in Firestore');
+              setUserProfile(null);
+              setIsAdmin(false);
+            }
           }
         } catch (error) {
           console.error('Error fetching user profile:', error);

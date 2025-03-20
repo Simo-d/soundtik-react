@@ -29,7 +29,7 @@ export const FormProvider = ({ children }) => {
       genre: '',
       mood: '',
       releaseDate: null,
-      audioUrl: '',
+      audioUrl: '', // This will now store the audio link provided by the artist
       coverArtUrl: '',
       lyrics: ''
     },
@@ -155,7 +155,7 @@ export const FormProvider = ({ children }) => {
           isValid = false;
         }
         if (!formData.songDetails.audioUrl) {
-          stepErrors.audioUrl = 'Audio file is required';
+          stepErrors.audioUrl = 'Audio link is required';
           isValid = false;
         }
         break;

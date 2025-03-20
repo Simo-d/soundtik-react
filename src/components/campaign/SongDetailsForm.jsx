@@ -1,10 +1,7 @@
 import React, { useState } from 'react';
 import { useFormContext } from '../../contexts/FormContext';
-import { useStorage } from '../../hooks/useStorage';
 import { logFormStepComplete } from '../../firebase/analytics';
 import Input from '../common/Input';
-import FileUpload from '../common/FileUpload';
-import AudioPlayer from '../common/AudioPlayer';
 import Button from '../common/Button';
 
 /**
@@ -12,7 +9,6 @@ import Button from '../common/Button';
  */
 const SongDetailsForm = ({ onNext }) => {
   const { formData, updateFormData, errors, validateStep } = useFormContext();
-  const { uploadAudioFile, uploadImageFile, progress, loading } = useStorage();
   
   // Local state for form handling
   const [localErrors, setLocalErrors] = useState({});
@@ -39,53 +35,13 @@ const SongDetailsForm = ({ onNext }) => {
     }
   };
 
-  // Handle audio file upload
-  const handleAudioUpload = async (files) => {
-    if (!files || files.length === 0) return;
-    
+  // Validate URL format
+  const validateUrl = (url) => {
     try {
-      const file = files[0];
-      const audioUrl = await uploadAudioFile(file);
-      
-      if (audioUrl) {
-        updateFormData('songDetails', { audioUrl });
-        
-        // Clear local error
-        if (localErrors.audioUrl) {
-          setLocalErrors(prev => ({ ...prev, audioUrl: '' }));
-        }
-      }
+      new URL(url);
+      return true;
     } catch (error) {
-      console.error('Audio upload error:', error);
-      setLocalErrors(prev => ({ 
-        ...prev, 
-        audioUrl: 'Failed to upload audio file. Please try again.' 
-      }));
-    }
-  };
-
-  // Handle cover art upload
-  const handleCoverArtUpload = async (files) => {
-    if (!files || files.length === 0) return;
-    
-    try {
-      const file = files[0];
-      const coverArtUrl = await uploadImageFile(file);
-      
-      if (coverArtUrl) {
-        updateFormData('songDetails', { coverArtUrl });
-        
-        // Clear local error
-        if (localErrors.coverArtUrl) {
-          setLocalErrors(prev => ({ ...prev, coverArtUrl: '' }));
-        }
-      }
-    } catch (error) {
-      console.error('Cover art upload error:', error);
-      setLocalErrors(prev => ({ 
-        ...prev, 
-        coverArtUrl: 'Failed to upload cover art. Please try again.' 
-      }));
+      return false;
     }
   };
 
@@ -104,8 +60,10 @@ const SongDetailsForm = ({ onNext }) => {
       newErrors.genre = 'Genre is required';
     }
     
-    if (!formData.songDetails.audioUrl) {
-      newErrors.audioUrl = 'Audio file is required';
+    if (!formData.songDetails.audioUrl.trim()) {
+      newErrors.audioUrl = 'Audio link is required';
+    } else if (!validateUrl(formData.songDetails.audioUrl)) {
+      newErrors.audioUrl = 'Please enter a valid URL';
     }
     
     // Update local errors
@@ -116,6 +74,26 @@ const SongDetailsForm = ({ onNext }) => {
       logFormStepComplete('campaign_creation', 0, 'songDetails');
       onNext();
     }
+  };
+
+  // Audio preview component
+  const AudioPreview = () => {
+    if (!formData.songDetails.audioUrl || !validateUrl(formData.songDetails.audioUrl)) {
+      return null;
+    }
+
+    return (
+      <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+        <h3 className="text-lg font-medium mb-2">Audio Preview</h3>
+        <audio 
+          controls 
+          src={formData.songDetails.audioUrl}
+          className="w-full"
+        >
+          Your browser does not support the audio element.
+        </audio>
+      </div>
+    );
   };
 
   return (
@@ -173,51 +151,35 @@ const SongDetailsForm = ({ onNext }) => {
           className="mb-4"
         />
         
-        {/* Audio Upload */}
-        <FileUpload
-          accept="audio/*"
-          id="audioFile"
-          name="audioFile"
-          label="Upload Audio File"
-          onChange={handleAudioUpload}
+        {/* Audio Link */}
+        <Input
+          type="url"
+          id="audioUrl"
+          name="audioUrl"
+          label="Audio Link"
+          value={formData.songDetails.audioUrl}
+          onChange={handleChange}
           error={localErrors.audioUrl || errors.audioUrl}
           required
+          placeholder="https://music-platform.com/your-song"
+          helperText="Link to your song on Spotify, SoundCloud, YouTube, or other platform"
           className="mb-4"
-          previewType="audio"
-          previewUrl={formData.songDetails.audioUrl}
-          uploading={loading}
-          progress={progress}
-          maxSize={10} // 10MB max
-          helperText="Upload your song in MP3, WAV, or M4A format (10MB max)"
         />
         
         {/* Audio Preview */}
-        {formData.songDetails.audioUrl && (
-          <div className="mb-4">
-            <AudioPlayer
-              src={formData.songDetails.audioUrl}
-              title={formData.songDetails.title || 'Your Song'}
-              showThumbnail={!!formData.songDetails.coverArtUrl}
-              thumbnail={formData.songDetails.coverArtUrl}
-            />
-          </div>
-        )}
+        <AudioPreview />
         
-        {/* Cover Art Upload */}
-        <FileUpload
-          accept="image/*"
-          id="coverArt"
-          name="coverArt"
-          label="Upload Cover Art"
-          onChange={handleCoverArtUpload}
-          error={localErrors.coverArtUrl}
+        {/* Cover Art Link */}
+        <Input
+          type="url"
+          id="coverArtUrl"
+          name="coverArtUrl"
+          label="Cover Art Link (Optional)"
+          value={formData.songDetails.coverArtUrl}
+          onChange={handleChange}
+          placeholder="https://images.com/your-cover-art.jpg"
+          helperText="Link to your song's cover art"
           className="mb-4"
-          previewType="image"
-          previewUrl={formData.songDetails.coverArtUrl}
-          uploading={loading}
-          progress={progress}
-          maxSize={5} // 5MB max
-          helperText="Upload your cover art in JPG, PNG, or WEBP format (5MB max)"
         />
         
         {/* Lyrics */}
@@ -226,7 +188,7 @@ const SongDetailsForm = ({ onNext }) => {
             htmlFor="lyrics" 
             className="block mb-1 font-medium"
           >
-            Lyrics
+            Lyrics (Optional)
           </label>
           <textarea
             id="lyrics"
@@ -235,7 +197,7 @@ const SongDetailsForm = ({ onNext }) => {
             value={formData.songDetails.lyrics}
             onChange={handleChange}
             className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-            placeholder="Enter your song lyrics (optional)"
+            placeholder="Enter your song lyrics"
           />
         </div>
         
@@ -244,9 +206,8 @@ const SongDetailsForm = ({ onNext }) => {
           <Button
             type="submit"
             variant="primary"
-            disabled={loading}
           >
-            {loading ? 'Uploading...' : 'Next: Artist Details'}
+            Next: Artist Details
           </Button>
         </div>
       </form>
