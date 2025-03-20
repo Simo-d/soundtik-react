@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
+import { PayPalScriptProvider } from '@paypal/react-paypal-js';
 import { FormProvider } from '../contexts/FormContext';
 import { useAuth } from '../hooks/useAuth';
 import { logPageView } from '../firebase/analytics';
@@ -9,12 +10,21 @@ import Navbar from '../components/common/Navbar';
 import SongDetailsForm from '../components/campaign/SongDetailsForm';
 import ArtistDetailsForm from '../components/campaign/ArtistDetailsForm';
 import BudgetSelector from '../components/campaign/BudgetSelector';
+import CreatorTargeting from '../components/campaign/CreatorTargeting';
 import PaymentForm from '../components/campaign/PaymentForm';
 
 // Initialize Stripe with the public key
 const stripePromise = process.env.REACT_APP_STRIPE_PUBLIC_KEY 
   ? loadStripe(process.env.REACT_APP_STRIPE_PUBLIC_KEY) 
   : null;
+
+// PayPal options
+const paypalOptions = {
+  "client-id": process.env.REACT_APP_PAYPAL_CLIENT_ID || "test",
+  currency: "USD",
+  intent: "capture"
+};
+
 /**
  * Create Campaign page - multi-step form for campaign creation
  */
@@ -24,7 +34,6 @@ const CreateCampaign = () => {
   
   // Form step state
   const [currentStep, setCurrentStep] = useState(0);
-  const [isTargetingStep, setIsTargetingStep] = useState(false);
   
   // Track page view
   useEffect(() => {
@@ -41,20 +50,15 @@ const CreateCampaign = () => {
     setCurrentStep(currentStep - 1);
   };
   
-  // Set targeting step active
+  // Handle budget set (will move to targeting step)
   const handleBudgetSet = () => {
-    setIsTargetingStep(true);
-  };
-  
-  // Finish targeting
-  const handleTargetingDone = () => {
-    setIsTargetingStep(false);
+    // Budget is set, move to targeting step
     handleNext();
   };
   
   // Render step indicators
   const renderStepIndicators = () => {
-    const steps = ['Song Details', 'Artist Details', 'Campaign Settings', 'Payment'];
+    const steps = ['Song Details', 'Artist Details', 'Budget', 'Targeting', 'Payment'];
     
     return (
       <div className="mb-8">
@@ -102,16 +106,16 @@ const CreateCampaign = () => {
       case 1:
         return <ArtistDetailsForm onNext={handleNext} onBack={handleBack} />;
       case 2:
-        if (isTargetingStep) {
-          // This would be a targeting component if implemented
-          return <div>Targeting Component (placeholder)</div>;
-        }
-        return <BudgetSelector onBudgetSet={handleBudgetSet} />;
+        return <BudgetSelector onBudgetSet={handleBudgetSet} onNext={handleNext} />;
       case 3:
+        return <CreatorTargeting onNext={handleNext} onBack={handleBack} />;
+      case 4:
         return (
-          <Elements stripe={stripePromise}>
-            <PaymentForm onBack={handleBack} />
-          </Elements>
+          <PayPalScriptProvider options={paypalOptions}>
+            <Elements stripe={stripePromise}>
+              <PaymentForm onBack={handleBack} />
+            </Elements>
+          </PayPalScriptProvider>
         );
       default:
         return <SongDetailsForm onNext={handleNext} />;

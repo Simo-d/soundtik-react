@@ -98,6 +98,32 @@ export const getUserCampaigns = async (userId) => {
 };
 
 /**
+ * Get all active campaigns
+ * @param {number} limitCount - Number of campaigns to retrieve
+ * @returns {Promise<Array>} - Array of active campaign objects
+ */
+export const getActiveCampaigns = async (limitCount = 50) => {
+  try {
+    const campaignsRef = collection(db, 'campaigns');
+    const q = query(
+      campaignsRef,
+      where('status', '==', 'active'),
+      orderBy('startDate', 'desc'),
+      limit(limitCount)
+    );
+    
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+  } catch (error) {
+    console.error('Error getting active campaigns:', error);
+    throw error;
+  }
+};
+
+/**
  * Update a campaign
  * @param {string} campaignId - Campaign ID
  * @param {Object} campaignData - Updated campaign data
@@ -192,6 +218,39 @@ export const getCampaignMetrics = async (campaignId) => {
 };
 
 /**
+ * Update campaign metrics summary
+ * @param {string} campaignId - Campaign ID
+ * @param {Object} metrics - Updated metrics data
+ * @returns {Promise<void>}
+ */
+export const updateCampaignMetrics = async (campaignId, metrics) => {
+  try {
+    const metricsRef = doc(db, 'campaignMetrics', campaignId);
+    
+    // Check if document exists
+    const docSnap = await getDoc(metricsRef);
+    
+    if (docSnap.exists()) {
+      // Update existing document
+      await updateDoc(metricsRef, {
+        summary: metrics,
+        updatedAt: serverTimestamp()
+      });
+    } else {
+      // Create new document
+      await setDoc(metricsRef, {
+        summary: metrics,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+    }
+  } catch (error) {
+    console.error('Error updating campaign metrics:', error);
+    throw error;
+  }
+};
+
+/**
  * Get daily metrics for a campaign
  * @param {string} campaignId - Campaign ID
  * @returns {Promise<Array>} - Array of daily metrics
@@ -247,23 +306,8 @@ export const getCampaignVideos = async (campaignId) => {
     const querySnapshot = await getDocs(q);
     
     if (querySnapshot.empty) {
-      // If no videos exist yet, create mock videos for testing
-      return Array.from({ length: 3 }, (_, i) => ({
-        id: `video-${i}`,
-        campaignId,
-        tiktokId: `tt${Math.random().toString(36).substring(2, 10)}`,
-        url: `https://tiktok.com/@creator/video/${Math.random().toString(36).substring(2, 15)}`,
-        thumbnail: `https://via.placeholder.com/300x500?text=TikTok+Video+${i+1}`,
-        caption: `Check out this amazing song! #trending #music #viral ${i === 0 ? '#newartist' : ''}`,
-        createdAt: new Date(Date.now() - i * 86400000 * 2),
-        metrics: {
-          views: Math.floor(Math.random() * 5000),
-          likes: Math.floor(Math.random() * 500),
-          comments: Math.floor(Math.random() * 100),
-          shares: Math.floor(Math.random() * 150)
-        },
-        status: 'published'
-      }));
+      // If no videos exist yet, return empty array instead of mock data
+      return [];
     }
     
     return querySnapshot.docs.map(doc => ({
@@ -272,6 +316,133 @@ export const getCampaignVideos = async (campaignId) => {
     }));
   } catch (error) {
     console.error('Error getting campaign videos:', error);
+    throw error;
+  }
+};
+
+/**
+ * Add a TikTok video to a campaign
+ * @param {Object} videoData - Video data
+ * @returns {Promise<string>} - New video document ID
+ */
+export const addVideoToCampaign = async (videoData) => {
+  try {
+    // Ensure required fields
+    if (!videoData.campaignId || !videoData.url) {
+      throw new Error('Missing required fields for video');
+    }
+    
+    // Add timestamps
+    const enrichedVideoData = {
+      ...videoData,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+      status: videoData.status || 'published'
+    };
+    
+    // Add to Firestore
+    const videoRef = await addDoc(collection(db, 'videos'), enrichedVideoData);
+    
+    // Calculate and update campaign metrics
+    await updateCampaignMetricsFromVideos(videoData.campaignId);
+    
+    return videoRef.id;
+  } catch (error) {
+    console.error('Error adding video to campaign:', error);
+    throw error;
+  }
+};
+
+/**
+ * Update a video's metrics
+ * @param {string} videoId - Video ID
+ * @param {Object} metrics - Updated metrics
+ * @returns {Promise<void>}
+ */
+export const updateVideoMetrics = async (videoId, metrics) => {
+  try {
+    const videoRef = doc(db, 'videos', videoId);
+    await updateDoc(videoRef, {
+      metrics: metrics,
+      updatedAt: serverTimestamp()
+    });
+    
+    // Get the video to find its campaign
+    const videoSnap = await getDoc(videoRef);
+    if (videoSnap.exists()) {
+      const video = videoSnap.data();
+      // Update campaign metrics
+      await updateCampaignMetricsFromVideos(video.campaignId);
+    }
+  } catch (error) {
+    console.error('Error updating video metrics:', error);
+    throw error;
+  }
+};
+
+/**
+ * Delete a video
+ * @param {string} videoId - Video ID
+ * @returns {Promise<void>}
+ */
+export const deleteVideo = async (videoId) => {
+  try {
+    // Get the video to find its campaign
+    const videoRef = doc(db, 'videos', videoId);
+    const videoSnap = await getDoc(videoRef);
+    
+    if (!videoSnap.exists()) {
+      throw new Error('Video not found');
+    }
+    
+    const video = videoSnap.data();
+    const campaignId = video.campaignId;
+    
+    // Delete the video
+    await deleteDoc(videoRef);
+    
+    // Update campaign metrics
+    await updateCampaignMetricsFromVideos(campaignId);
+  } catch (error) {
+    console.error('Error deleting video:', error);
+    throw error;
+  }
+};
+
+/**
+ * Update campaign metrics based on all campaign videos
+ * @param {string} campaignId - Campaign ID
+ * @returns {Promise<void>}
+ */
+export const updateCampaignMetricsFromVideos = async (campaignId) => {
+  try {
+    // Get all videos for the campaign
+    const videos = await getCampaignVideos(campaignId);
+    
+    // Calculate totals
+    const metrics = videos.reduce((totals, video) => {
+      if (video.metrics) {
+        totals.views += video.metrics.views || 0;
+        totals.likes += video.metrics.likes || 0;
+        totals.comments += video.metrics.comments || 0;
+        totals.shares += video.metrics.shares || 0;
+      }
+      return totals;
+    }, { views: 0, likes: 0, comments: 0, shares: 0 });
+    
+    // Calculate engagement rate
+    const totalEngagements = metrics.likes + metrics.comments + metrics.shares;
+    const engagementRate = metrics.views > 0 
+      ? ((totalEngagements / metrics.views) * 100).toFixed(2)
+      : 0;
+    
+    metrics.engagement = parseFloat(engagementRate);
+    metrics.follows = Math.floor(metrics.views * 0.01); // Estimate followers as 1% of views
+    
+    // Update campaign metrics
+    await updateCampaignMetrics(campaignId, metrics);
+  } catch (error) {
+    console.error('Error updating campaign metrics from videos:', error);
     throw error;
   }
 };
@@ -346,12 +517,18 @@ export default {
   createCampaign,
   getCampaign,
   getUserCampaigns,
+  getActiveCampaigns,
   updateCampaign,
   deleteCampaign,
   submitCampaign,
   getCampaignMetrics,
+  updateCampaignMetrics,
   getDailyMetrics,
   getCampaignVideos,
+  addVideoToCampaign,
+  updateVideoMetrics,
+  deleteVideo,
+  updateCampaignMetricsFromVideos,
   getPendingCampaigns,
   validateCampaign
 };

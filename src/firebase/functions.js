@@ -1,5 +1,6 @@
 import { httpsCallable } from 'firebase/functions';
 import { functions } from './config';
+import { updateVideoMetrics } from './firestore';
 
 /**
  * Submit campaign for admin validation
@@ -31,6 +32,69 @@ export const validateCampaign = async (campaignId, isApproved, notes = '') => {
     return result.data;
   } catch (error) {
     console.error('Error validating campaign:', error);
+    throw error;
+  }
+};
+
+/**
+ * Fetch TikTok video details using the video ID
+ * @param {string} tiktokId - TikTok video ID
+ * @returns {Promise<Object>} - Video details
+ */
+export const fetchTikTokVideoDetails = async (tiktokId) => {
+  try {
+    // In a real application, this would call a cloud function that uses TikTok API
+    // For now, we'll simulate a response with mock data
+    console.log('Fetching TikTok details for video:', tiktokId);
+    
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    
+    // Simulate a response with some random data
+    return {
+      tiktokId,
+      username: `creator_${Math.floor(Math.random() * 1000)}`,
+      caption: `This is an awesome TikTok video with #trending #music #${tiktokId.substring(0, 5)}`,
+      thumbnail: `https://via.placeholder.com/300x500?text=TikTok+${tiktokId.substring(0, 6)}`,
+      views: 1000 + Math.floor(Math.random() * 50000),
+      likes: 100 + Math.floor(Math.random() * 5000),
+      comments: 10 + Math.floor(Math.random() * 500),
+      shares: 5 + Math.floor(Math.random() * 200)
+    };
+  } catch (error) {
+    console.error('Error fetching TikTok video details:', error);
+    throw error;
+  }
+};
+
+/**
+ * Refresh metrics for a specific video
+ * @param {string} videoId - Video document ID
+ * @param {string} tiktokId - TikTok video ID
+ * @returns {Promise<Object>} - Updated metrics
+ */
+export const refreshVideoMetrics = async (videoId, tiktokId) => {
+  try {
+    // In a real app, this would call a cloud function that pulls fresh data from TikTok API
+    console.log('Refreshing metrics for video:', videoId, 'TikTok ID:', tiktokId);
+    
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    // Simulate updated metrics with higher numbers (as if the video gained more engagement)
+    const metrics = {
+      views: 1000 + Math.floor(Math.random() * 100000),
+      likes: 100 + Math.floor(Math.random() * 10000),
+      comments: 10 + Math.floor(Math.random() * 1000),
+      shares: 5 + Math.floor(Math.random() * 500)
+    };
+    
+    // Update the video document in Firestore
+    await updateVideoMetrics(videoId, metrics);
+    
+    return metrics;
+  } catch (error) {
+    console.error('Error refreshing video metrics:', error);
     throw error;
   }
 };
@@ -93,5 +157,7 @@ export default {
   handlePaymentSuccess,
   handlePaymentFailure,
   fetchTikTokMetrics,
+  fetchTikTokVideoDetails,
+  refreshVideoMetrics,
   processAudio
 };

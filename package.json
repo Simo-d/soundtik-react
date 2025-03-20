@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "@paypal/react-paypal-js": "^8.8.2",
     "@stripe/react-stripe-js": "^3.4.0",
     "@stripe/stripe-js": "^6.1.0",
     "@testing-library/dom": "^10.4.0",

@@ -1,5 +1,12 @@
 import React, { createContext, useState, useEffect, useCallback } from 'react';
-import { getUserCampaigns, getCampaign, getCampaignMetrics, getCampaignVideos } from '../firebase/firestore';
+import { 
+  getUserCampaigns, 
+  getCampaign, 
+  getCampaignMetrics, 
+  getCampaignVideos, 
+  updateCampaignMetricsFromVideos,
+  submitCampaign 
+} from '../firebase/firestore';
 import { useAuth } from '../hooks/useAuth';
 
 // Create the context
@@ -88,6 +95,15 @@ export const CampaignProvider = ({ children }) => {
       const videos = await getCampaignVideos(campaignId);
       setCampaignVideos(videos);
       
+      // Update campaign metrics based on the actual videos
+      if (videos.length > 0) {
+        await updateCampaignMetricsFromVideos(campaignId);
+        
+        // Refetch metrics to get the updated values
+        const updatedMetrics = await getCampaignMetrics(campaignId);
+        setCampaignMetrics(updatedMetrics);
+      }
+      
       setError(null);
     } catch (err) {
       console.error('Error loading campaign details:', err);
@@ -110,13 +126,16 @@ export const CampaignProvider = ({ children }) => {
       const campaignData = await getCampaign(activeCampaign.id);
       setActiveCampaign(campaignData);
       
-      // Refresh campaign metrics
-      const metrics = await getCampaignMetrics(activeCampaign.id);
-      setCampaignMetrics(metrics);
-      
       // Refresh campaign videos
       const videos = await getCampaignVideos(activeCampaign.id);
       setCampaignVideos(videos);
+      
+      // Update campaign metrics based on the refreshed videos
+      await updateCampaignMetricsFromVideos(activeCampaign.id);
+      
+      // Refresh campaign metrics
+      const metrics = await getCampaignMetrics(activeCampaign.id);
+      setCampaignMetrics(metrics);
       
       setError(null);
     } catch (err) {
@@ -126,6 +145,54 @@ export const CampaignProvider = ({ children }) => {
       setActiveCampaignLoading(false);
     }
   }, [activeCampaign]);
+
+  /**
+   * Submit a campaign for approval
+   * @param {string} campaignId - Campaign ID to submit
+   */
+  const submitCampaignForApproval = useCallback(async (campaignId) => {
+    try {
+      await submitCampaign(campaignId);
+      
+      // Update local campaigns list
+      setCampaigns(prevCampaigns => {
+        return prevCampaigns.map(campaign => {
+          if (campaign.id === campaignId) {
+            return {
+              ...campaign,
+              status: 'pending',
+              submittedAt: new Date()
+            };
+          }
+          return campaign;
+        });
+      });
+      
+      // If this is the active campaign, update it too
+      if (activeCampaign && activeCampaign.id === campaignId) {
+        setActiveCampaign({
+          ...activeCampaign,
+          status: 'pending',
+          submittedAt: new Date()
+        });
+      }
+      
+      return true;
+    } catch (err) {
+      console.error('Error submitting campaign:', err);
+      setError('Failed to submit campaign for approval');
+      return false;
+    }
+  }, [activeCampaign]);
+
+  /**
+   * Get a single campaign by ID
+   * @param {string} campaignId - Campaign ID to get
+   * @returns {Object|null} - Campaign data or null if not found
+   */
+  const getCampaignById = useCallback((campaignId) => {
+    return campaigns.find(campaign => campaign.id === campaignId) || null;
+  }, [campaigns]);
 
   /**
    * Clear active campaign
@@ -148,6 +215,8 @@ export const CampaignProvider = ({ children }) => {
     refreshCampaigns,
     loadCampaignDetails,
     refreshActiveCampaign,
+    submitCampaignForApproval,
+    getCampaignById,
     clearActiveCampaign,
     setError,
   };

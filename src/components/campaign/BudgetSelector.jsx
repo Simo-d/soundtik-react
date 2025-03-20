@@ -2,31 +2,30 @@ import React, { useState, useEffect } from 'react';
 import { useFormContext } from '../../contexts/FormContext';
 import Input from '../common/Input';
 import Button from '../common/Button';
+import ProgressBar from '../common/ProgressBar';
 
 /**
  * Budget and duration selector component - part of the third step of campaign creation
  */
-const BudgetSelector = ({ onBudgetSet }) => {
+const BudgetSelector = ({ onBudgetSet, onNext }) => {
   const { formData, updateFormData, errors } = useFormContext();
   
   // Local state for form handling
   const [localErrors, setLocalErrors] = useState({});
+  const [estimatedVideos, setEstimatedVideos] = useState(0);
   const [estimatedReach, setEstimatedReach] = useState({
     min: 0,
     max: 0
   });
   
-  // Budget options
-  const budgetOptions = [
-    { value: 100, label: "$100" },
-    { value: 250, label: "$250" },
-    { value: 500, label: "$500" },
-    { value: 1000, label: "$1,000" },
-    { value: 2500, label: "$2,500" },
-    { value: 5000, label: "$5,000" },
-    { value: 10000, label: "$10,000" },
-    { value: "custom", label: "Custom" }
-  ];
+  // Budget range settings
+  const minBudget = 200;
+  const maxBudget = 2000;
+  
+  // Budget options - replaced with a slider
+  const [sliderBudget, setSliderBudget] = useState(
+    formData.campaignDetails.budget || minBudget
+  );
   
   // Duration options
   const durationOptions = [
@@ -39,12 +38,6 @@ const BudgetSelector = ({ onBudgetSet }) => {
   ];
   
   // Local state for form values
-  const [selectedBudget, setSelectedBudget] = useState(formData.campaignDetails.budget || budgetOptions[0].value);
-  const [customBudget, setCustomBudget] = useState(
-    formData.campaignDetails.budget && !budgetOptions.some(opt => opt.value === formData.campaignDetails.budget) 
-      ? formData.campaignDetails.budget 
-      : ""
-  );
   const [selectedDuration, setSelectedDuration] = useState(formData.campaignDetails.duration || durationOptions[0].value);
   const [customDuration, setCustomDuration] = useState(
     formData.campaignDetails.duration && !durationOptions.some(opt => opt.value === formData.campaignDetails.duration) 
@@ -52,14 +45,28 @@ const BudgetSelector = ({ onBudgetSet }) => {
       : ""
   );
   
+  // Update form data when slider changes
+  useEffect(() => {
+    updateFormData('campaignDetails', { budget: sliderBudget });
+  }, [sliderBudget, updateFormData]);
+  
+  // Calculate estimated videos based on budget
+  useEffect(() => {
+    // Formula: 1 video per $100, with slight scaling for larger budgets
+    const baseVideos = Math.floor(sliderBudget / 100);
+    const bonusVideos = Math.floor((sliderBudget / 1000) * 2); // 2 bonus videos per $1000
+    const total = baseVideos + bonusVideos;
+    
+    setEstimatedVideos(total);
+  }, [sliderBudget]);
+  
   // Calculate estimated reach based on budget and duration
   useEffect(() => {
-    const budget = selectedBudget === "custom" ? parseFloat(customBudget) || 0 : selectedBudget;
+    const budget = sliderBudget;
     const duration = selectedDuration === "custom" ? parseInt(customDuration) || 0 : selectedDuration;
     
-    // Simple formula: $1 = ~100-200 views
-    // Adjust based on your actual metrics or estimation logic
-    const baseReach = budget * 150;
+    // Formula: $1 = ~120-240 views, with bonus for longer durations
+    const baseReach = budget * 180;
     const durationMultiplier = Math.sqrt(duration / 30); // Square root for diminishing returns
     
     const estimatedBaseReach = Math.round(baseReach * durationMultiplier);
@@ -67,28 +74,13 @@ const BudgetSelector = ({ onBudgetSet }) => {
       min: Math.round(estimatedBaseReach * 0.8), // 20% lower bound
       max: Math.round(estimatedBaseReach * 1.2), // 20% upper bound
     });
-  }, [selectedBudget, customBudget, selectedDuration, customDuration]);
+  }, [sliderBudget, selectedDuration, customDuration]);
   
-  // Handle budget option selection
-  const handleBudgetSelect = (value) => {
-    setSelectedBudget(value);
-    if (value !== "custom") {
-      updateFormData('campaignDetails', { budget: value });
-    }
-  };
-  
-  // Handle custom budget input
-  const handleCustomBudgetChange = (e) => {
-    const value = e.target.value;
-    setCustomBudget(value);
-    
-    const numValue = parseFloat(value);
-    if (!isNaN(numValue) && numValue > 0) {
-      updateFormData('campaignDetails', { budget: numValue });
-      setLocalErrors(prev => ({ ...prev, budget: '' }));
-    } else {
-      setLocalErrors(prev => ({ ...prev, budget: 'Please enter a valid budget' }));
-    }
+  // Handle slider change
+  const handleSliderChange = (e) => {
+    const value = parseInt(e.target.value);
+    setSliderBudget(value);
+    setLocalErrors(prev => ({ ...prev, budget: '' }));
   };
   
   // Handle duration option selection
@@ -113,14 +105,18 @@ const BudgetSelector = ({ onBudgetSet }) => {
     }
   };
   
+  // Calculate percentage for progress bar
+  const calculatePercentage = () => {
+    return ((sliderBudget - minBudget) / (maxBudget - minBudget)) * 100;
+  };
+  
   // Handle continue
   const handleContinue = () => {
     // Validate budget and duration
     const newErrors = {};
     
-    const budget = selectedBudget === "custom" ? parseFloat(customBudget) : selectedBudget;
-    if (!budget || budget <= 0) {
-      newErrors.budget = 'Please select a valid budget';
+    if (!sliderBudget || sliderBudget < minBudget) {
+      newErrors.budget = `Minimum budget is $${minBudget}`;
     }
     
     const duration = selectedDuration === "custom" ? parseInt(customDuration) : selectedDuration;
@@ -133,6 +129,7 @@ const BudgetSelector = ({ onBudgetSet }) => {
     // If no errors, continue
     if (Object.keys(newErrors).length === 0) {
       onBudgetSet();
+      onNext();
     }
   };
   
@@ -141,43 +138,49 @@ const BudgetSelector = ({ onBudgetSet }) => {
       <h3 className="text-xl font-bold mb-4">Campaign Budget & Duration</h3>
       
       {/* Budget Selection */}
-      <div className="mb-6">
+      <div className="mb-8">
         <label className="block mb-2 font-medium">
-          Select Your Budget
+          Select Your Budget - ${sliderBudget}
         </label>
         
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
-          {budgetOptions.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              className={`
-                py-2 px-4 border rounded-md text-center transition-all
-                ${selectedBudget === option.value 
-                  ? 'bg-primary text-white border-primary' 
-                  : 'bg-white text-gray-700 border-gray-300 hover:border-primary'}
-              `}
-              onClick={() => handleBudgetSelect(option.value)}
-            >
-              {option.label}
-            </button>
-          ))}
+        <div className="mb-6">
+          <div className="flex justify-between text-sm text-gray-600 mb-2">
+            <span>${minBudget}</span>
+            <span>${maxBudget}</span>
+          </div>
+          <input
+            type="range"
+            min={minBudget}
+            max={maxBudget}
+            step="50"
+            value={sliderBudget}
+            onChange={handleSliderChange}
+            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary"
+          />
         </div>
         
-        {selectedBudget === "custom" && (
-          <Input
-            type="number"
-            id="customBudget"
-            name="customBudget"
-            label="Enter Custom Budget ($)"
-            value={customBudget}
-            onChange={handleCustomBudgetChange}
-            min={50}
-            step={50}
-            error={localErrors.budget || errors.budget}
-            required
+        <div className="mb-4">
+          <ProgressBar 
+            progress={calculatePercentage()} 
+            height={10} 
+            color="primary" 
+            rounded={true}
+            animate={true}
           />
+        </div>
+        
+        {localErrors.budget && (
+          <p className="text-error text-sm mb-4">{localErrors.budget}</p>
         )}
+        
+        <div className="bg-purple-50 border border-purple-200 rounded-md p-4 mb-6">
+          <p className="text-primary font-medium mb-2">With this budget, you'll receive approximately:</p>
+          <p className="text-2xl font-bold text-primary mb-2">{estimatedVideos} TikTok videos</p>
+          <p className="text-sm text-gray-600">
+            Our network of content creators will create original videos featuring your music.
+            Higher budgets yield more videos and greater reach.
+          </p>
+        </div>
       </div>
       
       {/* Duration Selection */}
@@ -240,7 +243,7 @@ const BudgetSelector = ({ onBudgetSet }) => {
           variant="primary"
           onClick={handleContinue}
         >
-          Continue
+          Continue to Targeting
         </Button>
       </div>
     </div>

@@ -45,8 +45,15 @@ export const FormProvider = ({ children }) => {
       pressKit: ''
     },
     campaignDetails: {
-      budget: 0,
+      budget: 200, // Set default budget to minimum $200
       duration: 30,
+      // New field for creator targeting
+      creatorTargeting: {
+        creatorTypes: [],
+        audienceAge: [],
+        preferredStyles: [],
+        notes: ''
+      },
       targetAudience: {
         ageRange: [],
         interests: [],
@@ -56,7 +63,9 @@ export const FormProvider = ({ children }) => {
       hashtags: []
     },
     paymentDetails: {
+      processor: '', // 'stripe' or 'paypal'
       stripePaymentId: '',
+      paypalTransactionId: '',
       amount: 0,
       status: 'pending',
       createdAt: null
@@ -107,6 +116,57 @@ export const FormProvider = ({ children }) => {
   }, []);
 
   /**
+   * Update array values in nested data
+   * @param {string} section - Main section (campaignDetails, etc.)
+   * @param {string} subsection - Subsection (creatorTargeting, etc.)
+   * @param {string} field - Array field name (creatorTypes, audienceAge, etc.)
+   * @param {Array} values - Array values
+   */
+  const updateArrayValues = useCallback((section, subsection, field, values) => {
+    setFormData(prev => ({
+      ...prev,
+      [section]: {
+        ...prev[section],
+        [subsection]: {
+          ...prev[section][subsection],
+          [field]: values
+        }
+      }
+    }));
+  }, []);
+
+  /**
+   * Toggle a value in an array field
+   * @param {string} section - Main section (campaignDetails, etc.)
+   * @param {string} subsection - Subsection (creatorTargeting, etc.)
+   * @param {string} field - Array field name (creatorTypes, audienceAge, etc.)
+   * @param {string} value - Value to toggle
+   */
+  const toggleArrayValue = useCallback((section, subsection, field, value) => {
+    setFormData(prev => {
+      const currentValues = prev[section][subsection][field] || [];
+      let newValues;
+      
+      if (currentValues.includes(value)) {
+        newValues = currentValues.filter(v => v !== value);
+      } else {
+        newValues = [...currentValues, value];
+      }
+      
+      return {
+        ...prev,
+        [section]: {
+          ...prev[section],
+          [subsection]: {
+            ...prev[section][subsection],
+            [field]: newValues
+          }
+        }
+      };
+    });
+  }, []);
+
+  /**
    * Move to the next step in the form
    */
   const nextStep = useCallback(() => {
@@ -114,7 +174,7 @@ export const FormProvider = ({ children }) => {
     setCurrentStep(newStep);
     
     // Log analytics for step completion
-    const stepNames = ['songDetails', 'artistDetails', 'campaignDetails', 'payment'];
+    const stepNames = ['songDetails', 'artistDetails', 'budget', 'targeting', 'payment'];
     logFormStepComplete('campaign_creation', currentStep, stepNames[currentStep]);
   }, [currentStep]);
 
@@ -138,7 +198,7 @@ export const FormProvider = ({ children }) => {
    * @returns {boolean} - Whether the current step is valid
    */
   const validateStep = useCallback(() => {
-    const stepNames = ['songDetails', 'artistDetails', 'campaignDetails', 'paymentDetails'];
+    const stepNames = ['songDetails', 'artistDetails', 'budget', 'targeting', 'payment'];
     const currentSection = stepNames[currentStep];
     let stepErrors = {};
     let isValid = true;
@@ -167,13 +227,20 @@ export const FormProvider = ({ children }) => {
         }
         break;
         
-      case 'campaignDetails':
-        if (!formData.campaignDetails.budget || formData.campaignDetails.budget <= 0) {
-          stepErrors.budget = 'Budget must be greater than 0';
+      case 'budget':
+        if (!formData.campaignDetails.budget || formData.campaignDetails.budget < 200) {
+          stepErrors.budget = 'Budget must be at least $200';
           isValid = false;
         }
         if (!formData.campaignDetails.duration || formData.campaignDetails.duration < 7) {
           stepErrors.duration = 'Duration must be at least 7 days';
+          isValid = false;
+        }
+        break;
+        
+      case 'targeting':
+        if (!formData.campaignDetails.creatorTargeting.creatorTypes.length) {
+          stepErrors.creatorTypes = 'Please select at least one creator type';
           isValid = false;
         }
         break;
@@ -212,8 +279,14 @@ export const FormProvider = ({ children }) => {
         pressKit: ''
       },
       campaignDetails: {
-        budget: 0,
+        budget: 200,
         duration: 30,
+        creatorTargeting: {
+          creatorTypes: [],
+          audienceAge: [],
+          preferredStyles: [],
+          notes: ''
+        },
         targetAudience: {
           ageRange: [],
           interests: [],
@@ -223,7 +296,9 @@ export const FormProvider = ({ children }) => {
         hashtags: []
       },
       paymentDetails: {
+        processor: '',
         stripePaymentId: '',
+        paypalTransactionId: '',
         amount: 0,
         status: 'pending',
         createdAt: null
@@ -242,6 +317,8 @@ export const FormProvider = ({ children }) => {
     isSubmitting,
     updateFormData,
     updateNestedFormData,
+    updateArrayValues,
+    toggleArrayValue,
     nextStep,
     prevStep,
     goToStep,
