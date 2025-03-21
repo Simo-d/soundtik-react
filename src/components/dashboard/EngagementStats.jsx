@@ -9,7 +9,7 @@ import { useCampaign } from '../../hooks/useCampaign';
 const EngagementStats = ({ metrics }) => {
   const { activeCampaignLoading, activeCampaign } = useCampaign();
   
-  // Calculate engagement metrics
+  // Calculate engagement metrics with safe handling for null/undefined values
   const calculateEngagementRate = () => {
     if (!metrics?.summary) return 0;
     
@@ -18,7 +18,14 @@ const EngagementStats = ({ metrics }) => {
     
     // Engagement rate = (likes + comments + shares) / views * 100
     const total = (likes || 0) + (comments || 0) + (shares || 0);
-    return (total / views) * 100;
+    const rate = (total / views) * 100;
+    return parseFloat(rate) || 0; // Ensure it's a number
+  };
+  
+  // Format percentage value, ensuring it's a number
+  const formatPercentage = (value, precision = 2) => {
+    const numValue = parseFloat(value);
+    return isNaN(numValue) ? '0.00%' : `${numValue.toFixed(precision)}%`;
   };
   
   // Get engagement rate compared to industry average
@@ -51,15 +58,10 @@ const EngagementStats = ({ metrics }) => {
       rate,
       industryAverage,
       difference,
-      percentDifference,
+      percentDifference: isNaN(percentDifference) ? 0 : percentDifference,
       isAboveAverage: difference > 0,
       category: primaryType !== 'default' ? primaryType : 'all categories'
     };
-  };
-  
-  // Format percentage
-  const formatPercentage = (value, precision = 2) => {
-    return value.toFixed(precision) + '%';
   };
   
   // Get color class based on comparison

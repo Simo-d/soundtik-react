@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useFormContext } from '../../contexts/FormContext';
-import Input from '../common/Input';
 import Button from '../common/Button';
-import ProgressBar from '../common/ProgressBar';
 
 /**
- * Budget and duration selector component - part of the third step of campaign creation
+ * Budget selector component - part of the campaign creation process
+ * Shows the relationship between budget and number of videos created by our network
  */
 const BudgetSelector = ({ onBudgetSet, onNext }) => {
   const { formData, updateFormData, errors } = useFormContext();
@@ -22,59 +21,43 @@ const BudgetSelector = ({ onBudgetSet, onNext }) => {
   const minBudget = 200;
   const maxBudget = 2000;
   
-  // Budget options - replaced with a slider
+  // Budget options - using a slider
   const [sliderBudget, setSliderBudget] = useState(
     formData.campaignDetails.budget || minBudget
   );
   
-  // Duration options
-  const durationOptions = [
-    { value: 7, label: "1 week" },
-    { value: 14, label: "2 weeks" },
-    { value: 30, label: "1 month" },
-    { value: 60, label: "2 months" },
-    { value: 90, label: "3 months" },
-    { value: "custom", label: "Custom" }
-  ];
-  
-  // Local state for form values
-  const [selectedDuration, setSelectedDuration] = useState(formData.campaignDetails.duration || durationOptions[0].value);
-  const [customDuration, setCustomDuration] = useState(
-    formData.campaignDetails.duration && !durationOptions.some(opt => opt.value === formData.campaignDetails.duration) 
-      ? formData.campaignDetails.duration 
-      : ""
-  );
-  
   // Update form data when slider changes
   useEffect(() => {
-    updateFormData('campaignDetails', { budget: sliderBudget });
+    // Set a standard 30-day campaign duration
+    updateFormData('campaignDetails', { 
+      budget: sliderBudget,
+      duration: 30 // Fixed 30-day campaign duration
+    });
   }, [sliderBudget, updateFormData]);
   
   // Calculate estimated videos based on budget
   useEffect(() => {
-    // Formula: 1 video per $100, with slight scaling for larger budgets
+    // Formula: $200 = 2 videos base, then 1 video per $100 with bonus videos for larger budgets
     const baseVideos = Math.floor(sliderBudget / 100);
-    const bonusVideos = Math.floor((sliderBudget / 1000) * 2); // 2 bonus videos per $1000
-    const total = baseVideos + bonusVideos;
+    const bonusVideos = Math.floor((sliderBudget / 1000) * 3); // 3 bonus videos per $1000
+    const total = Math.max(2, baseVideos + bonusVideos);
     
     setEstimatedVideos(total);
   }, [sliderBudget]);
   
-  // Calculate estimated reach based on budget and duration
+  // Calculate estimated reach based on budget and videos
   useEffect(() => {
-    const budget = sliderBudget;
-    const duration = selectedDuration === "custom" ? parseInt(customDuration) || 0 : selectedDuration;
+    // Formula: Each video reaches approximately 8,000-15,000 people
+    // Higher budgets get premium creators with more reach
+    const budgetFactor = sliderBudget > 1000 ? 1.3 : (sliderBudget > 500 ? 1.1 : 1.0);
+    const avgViewsPerVideo = 12000 * budgetFactor;
     
-    // Formula: $1 = ~120-240 views, with bonus for longer durations
-    const baseReach = budget * 180;
-    const durationMultiplier = Math.sqrt(duration / 30); // Square root for diminishing returns
-    
-    const estimatedBaseReach = Math.round(baseReach * durationMultiplier);
+    const totalEstimatedViews = estimatedVideos * avgViewsPerVideo;
     setEstimatedReach({
-      min: Math.round(estimatedBaseReach * 0.8), // 20% lower bound
-      max: Math.round(estimatedBaseReach * 1.2), // 20% upper bound
+      min: Math.round(totalEstimatedViews * 0.7), // 30% lower bound for variability
+      max: Math.round(totalEstimatedViews * 1.3), // 30% upper bound for variability
     });
-  }, [sliderBudget, selectedDuration, customDuration]);
+  }, [sliderBudget, estimatedVideos]);
   
   // Handle slider change
   const handleSliderChange = (e) => {
@@ -83,45 +66,18 @@ const BudgetSelector = ({ onBudgetSet, onNext }) => {
     setLocalErrors(prev => ({ ...prev, budget: '' }));
   };
   
-  // Handle duration option selection
-  const handleDurationSelect = (value) => {
-    setSelectedDuration(value);
-    if (value !== "custom") {
-      updateFormData('campaignDetails', { duration: value });
-    }
-  };
-  
-  // Handle custom duration input
-  const handleCustomDurationChange = (e) => {
-    const value = e.target.value;
-    setCustomDuration(value);
-    
-    const numValue = parseInt(value);
-    if (!isNaN(numValue) && numValue > 0) {
-      updateFormData('campaignDetails', { duration: numValue });
-      setLocalErrors(prev => ({ ...prev, duration: '' }));
-    } else {
-      setLocalErrors(prev => ({ ...prev, duration: 'Please enter a valid number of days' }));
-    }
-  };
-  
-  // Calculate percentage for progress bar
-  const calculatePercentage = () => {
-    return ((sliderBudget - minBudget) / (maxBudget - minBudget)) * 100;
+  // Calculate average cost per video
+  const calculateCostPerVideo = () => {
+    return estimatedVideos > 0 ? (sliderBudget / estimatedVideos).toFixed(2) : 0;
   };
   
   // Handle continue
   const handleContinue = () => {
-    // Validate budget and duration
+    // Validate budget
     const newErrors = {};
     
     if (!sliderBudget || sliderBudget < minBudget) {
       newErrors.budget = `Minimum budget is $${minBudget}`;
-    }
-    
-    const duration = selectedDuration === "custom" ? parseInt(customDuration) : selectedDuration;
-    if (!duration || duration <= 0) {
-      newErrors.duration = 'Please select a valid duration';
     }
     
     setLocalErrors(newErrors);
@@ -135,13 +91,14 @@ const BudgetSelector = ({ onBudgetSet, onNext }) => {
   
   return (
     <div className="max-w-2xl mx-auto">
-      <h3 className="text-xl font-bold mb-4">Campaign Budget & Duration</h3>
+      <h3 className="text-xl font-bold mb-4">Campaign Budget</h3>
       
       {/* Budget Selection */}
       <div className="mb-8">
-        <label className="block mb-2 font-medium">
-          Select Your Budget - ${sliderBudget}
-        </label>
+        <div className="flex justify-between items-center mb-2">
+          <label className="font-medium">Select Your Budget</label>
+          <span className="text-xl font-bold text-primary">${sliderBudget}</span>
+        </div>
         
         <div className="mb-6">
           <div className="flex justify-between text-sm text-gray-600 mb-2">
@@ -155,86 +112,75 @@ const BudgetSelector = ({ onBudgetSet, onNext }) => {
             step="50"
             value={sliderBudget}
             onChange={handleSliderChange}
-            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary"
-          />
-        </div>
-        
-        <div className="mb-4">
-          <ProgressBar 
-            progress={calculatePercentage()} 
-            height={10} 
-            color="primary" 
-            rounded={true}
-            animate={true}
+            className="w-full h-4 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary"
+            style={{
+              background: `linear-gradient(to right, #6200EA 0%, #6200EA ${((sliderBudget - minBudget) / (maxBudget - minBudget)) * 100}%, #e5e7eb ${((sliderBudget - minBudget) / (maxBudget - minBudget)) * 100}%, #e5e7eb 100%)`
+            }}
           />
         </div>
         
         {localErrors.budget && (
           <p className="text-error text-sm mb-4">{localErrors.budget}</p>
         )}
-        
-        <div className="bg-purple-50 border border-purple-200 rounded-md p-4 mb-6">
-          <p className="text-primary font-medium mb-2">With this budget, you'll receive approximately:</p>
-          <p className="text-2xl font-bold text-primary mb-2">{estimatedVideos} TikTok videos</p>
-          <p className="text-sm text-gray-600">
-            Our network of content creators will create original videos featuring your music.
-            Higher budgets yield more videos and greater reach.
-          </p>
-        </div>
       </div>
       
-      {/* Duration Selection */}
-      <div className="mb-6">
-        <label className="block mb-2 font-medium">
-          Select Campaign Duration
-        </label>
-        
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-4">
-          {durationOptions.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              className={`
-                py-2 px-4 border rounded-md text-center transition-all
-                ${selectedDuration === option.value 
-                  ? 'bg-primary text-white border-primary' 
-                  : 'bg-white text-gray-700 border-gray-300 hover:border-primary'}
-              `}
-              onClick={() => handleDurationSelect(option.value)}
-            >
-              {option.label}
-            </button>
-          ))}
+      {/* Video Information */}
+      <div className="bg-purple-50 border border-purple-200 rounded-md p-6 mb-8">
+        <div className="flex flex-col md:flex-row justify-between mb-6">
+          <div className="mb-4 md:mb-0">
+            <p className="text-gray-600 text-sm">Your budget will create</p>
+            <p className="text-3xl font-bold text-primary">{estimatedVideos} TikTok videos</p>
+            <p className="text-sm text-gray-600 mt-1">Average cost: ${calculateCostPerVideo()} per video</p>
+          </div>
+          <div>
+            <p className="text-gray-600 text-sm">Estimated total reach</p>
+            <p className="text-3xl font-bold text-primary">{(estimatedReach.min/1000).toFixed(1)}K-{(estimatedReach.max/1000).toFixed(1)}K views</p>
+            <p className="text-sm text-gray-600 mt-1">Across all videos</p>
+          </div>
         </div>
         
-        {selectedDuration === "custom" && (
-          <Input
-            type="number"
-            id="customDuration"
-            name="customDuration"
-            label="Enter Custom Duration (days)"
-            value={customDuration}
-            onChange={handleCustomDurationChange}
-            min={1}
-            step={1}
-            error={localErrors.duration || errors.duration}
-            required
-          />
-        )}
+        <hr className="border-purple-200 mb-4" />
+        
+        <h4 className="text-primary font-medium mb-2">How it works</h4>
+        <p className="text-sm text-gray-700 mb-3">
+          Your budget is directly converted into TikTok videos created by our vetted network of content creators. 
+          Each creator will produce an original video featuring your music, optimized for maximum engagement.
+        </p>
+        <p className="text-sm text-gray-700">
+          Higher budgets not only create more videos but also give you access to our premium creators with
+          larger followings and higher engagement rates.
+        </p>
       </div>
       
-      {/* Estimated Reach */}
-      <div className="mb-8 p-4 bg-gray-50 rounded-md border border-gray-200">
-        <h4 className="text-lg font-medium mb-2">Estimated Reach</h4>
-        <p className="text-gray-600 mb-2">
-          Based on your budget and duration, your campaign could reach:
-        </p>
-        <p className="text-2xl font-bold text-primary">
-          {estimatedReach.min.toLocaleString()} - {estimatedReach.max.toLocaleString()} views
-        </p>
-        <p className="text-sm text-gray-500 mt-2">
-          Note: Actual results may vary based on content quality, audience targeting, and market conditions.
-        </p>
+      {/* What's Included */}
+      <div className="mb-8 bg-gray-50 rounded-lg p-6 border border-gray-200">
+        <h4 className="font-medium text-lg mb-3">What's Included</h4>
+        <ul className="space-y-2">
+          <li className="flex items-start">
+            <svg className="h-5 w-5 text-green-500 mr-2 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+            </svg>
+            <span className="text-gray-700">{estimatedVideos} custom TikTok videos featuring your music</span>
+          </li>
+          <li className="flex items-start">
+            <svg className="h-5 w-5 text-green-500 mr-2 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+            </svg>
+            <span className="text-gray-700">Detailed performance tracking for each video</span>
+          </li>
+          <li className="flex items-start">
+            <svg className="h-5 w-5 text-green-500 mr-2 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+            </svg>
+            <span className="text-gray-700">Content creator matching based on your targeting preferences</span>
+          </li>
+          <li className="flex items-start">
+            <svg className="h-5 w-5 text-green-500 mr-2 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+            </svg>
+            <span className="text-gray-700">30-day campaign duration with real-time analytics</span>
+          </li>
+        </ul>
       </div>
       
       <div className="flex justify-end">

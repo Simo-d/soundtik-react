@@ -1,14 +1,30 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { getPendingCampaigns, validateCampaign, getCampaignVideos, addVideoToCampaign } from '../firebase/firestore';
+import { 
+  getPendingCampaigns, 
+  validateCampaign, 
+  getCampaignVideos, 
+  addVideoToCampaign
+} from '../firebase/firestore';
 import { fetchTikTokVideoDetails } from '../firebase/functions';
 import { logPageView } from '../firebase/analytics';
 import Navbar from '../components/common/Navbar';
-import Button from '../common/Button';
-import Input from '../common/Input';
+import Button from '../components/common/Button';
+import Input from '../components/common/Input';
 import AudioPlayer from '../components/common/AudioPlayer';
 import VideosList from '../components/dashboard/VideosList';
+
+// Import Firebase functions needed for getActiveCampaigns
+import { 
+  collection, 
+  query, 
+  where, 
+  orderBy, 
+  limit, 
+  getDocs 
+} from 'firebase/firestore';
+import { db } from '../firebase/config';
 
 /**
  * Admin Panel - Allows admins to review and approve/reject campaigns
@@ -61,9 +77,19 @@ const AdminPanel = () => {
         setLoading(true);
         const campaigns = await getPendingCampaigns();
         setPendingCampaigns(campaigns);
+        setError(null);
       } catch (err) {
         console.error('Error loading pending campaigns:', err);
-        setError('Failed to load campaigns');
+        
+        // Specific handling for permission errors
+        if (err.message.includes('Missing or insufficient permissions')) {
+          setError(
+            'Permission error: Your Firestore security rules are preventing admin access. ' +
+            'Please update your security rules to allow admin users to read all campaigns.'
+          );
+        } else {
+          setError('Failed to load campaigns: ' + err.message);
+        }
       } finally {
         setLoading(false);
       }
@@ -80,13 +106,13 @@ const AdminPanel = () => {
       try {
         setLoading(true);
         
-        // This would be a new function in the firestore.js file
-        // to fetch all active campaigns
-        const campaigns = await getActiveCampaigns();
-        setActiveCampaigns(campaigns);
+        // Get campaigns with status 'active'
+        const campaignsRef = await getActiveCampaigns();
+        setActiveCampaigns(campaignsRef);
+        setError(null);
       } catch (err) {
         console.error('Error loading active campaigns:', err);
-        setError('Failed to load active campaigns');
+        setError('Failed to load active campaigns: ' + err.message);
       } finally {
         setLoading(false);
       }
@@ -107,7 +133,7 @@ const AdminPanel = () => {
         setCampaignVideos(videos);
       } catch (err) {
         console.error('Error loading campaign videos:', err);
-        setError('Failed to load campaign videos');
+        setError('Failed to load campaign videos: ' + err.message);
       }
     };
     
@@ -155,7 +181,7 @@ const AdminPanel = () => {
       }, 2000);
     } catch (err) {
       console.error('Error approving campaign:', err);
-      setError('Failed to approve campaign');
+      setError('Failed to approve campaign: ' + err.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -188,7 +214,7 @@ const AdminPanel = () => {
       }, 2000);
     } catch (err) {
       console.error('Error rejecting campaign:', err);
-      setError('Failed to reject campaign');
+      setError('Failed to reject campaign: ' + err.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -306,6 +332,34 @@ const AdminPanel = () => {
       minute: '2-digit'
     });
   };
+
+  /**
+   * Get active campaigns
+   * Function implemented directly in this component but should be moved to firestore.js
+   * @param {number} limitCount - Maximum number of campaigns to return
+   * @returns {Promise<Array>} Array of active campaign objects
+   */
+  const getActiveCampaigns = async (limitCount = 20) => {
+    try {
+      const campaignsRef = collection(db, 'campaigns');
+      const q = query(
+        campaignsRef,
+        where('status', '==', 'active'),
+        orderBy('startDate', 'desc'),
+        limit(limitCount)
+      );
+      
+      const querySnapshot = await getDocs(q);
+      return querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+    } catch (error) {
+      console.error('Error getting active campaigns:', error);
+      throw error;
+    }
+  };
+  
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
       <Navbar />
@@ -576,7 +630,6 @@ const AdminPanel = () => {
                           value={reviewNotes}
                           onChange={handleNotesChange}
                           placeholder="Add notes (required for rejection)"
-                          multiline
                           rows={4}
                         />
                       </div>

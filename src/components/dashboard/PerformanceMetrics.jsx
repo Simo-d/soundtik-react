@@ -22,14 +22,30 @@ const PerformanceMetrics = ({ metrics }) => {
   // Use provided metrics or placeholders
   const campaignMetrics = metrics?.summary || placeholderMetrics;
   
-  // Calculate percentage for engagement
-  const engagementPercentage = campaignMetrics.engagement ? 
-    campaignMetrics.engagement.toFixed(2) + '%' : 
-    '0%';
+  // Calculate percentage for engagement - safely handle non-number values
+  const formatEngagementPercentage = (engagement) => {
+    if (engagement === undefined || engagement === null) return '0%';
+    
+    // If it's already a string, check if it ends with %
+    if (typeof engagement === 'string') {
+      return engagement.endsWith('%') ? engagement : `${engagement}%`;
+    }
+    
+    // If it's a number, format it
+    if (typeof engagement === 'number') {
+      return `${engagement.toFixed(2)}%`;
+    }
+    
+    // Default fallback
+    return '0%';
+  };
+  
+  const engagementPercentage = formatEngagementPercentage(campaignMetrics.engagement);
     
   // Format numbers with commas
   const formatNumber = (num) => {
-    return num?.toLocaleString() || '0';
+    if (num === undefined || num === null) return '0';
+    return String(num).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   };
   
   // Calculate cost per metrics
@@ -50,6 +66,12 @@ const PerformanceMetrics = ({ metrics }) => {
     let thresholds;
     switch (type) {
       case 'engagement':
+        // Ensure metric is a number for engagement
+        const engagementValue = parseFloat(metric.replace('%', ''));
+        if (isNaN(engagementValue)) {
+          return { score: 0, label: 'Unknown', color: 'text-gray-500' };
+        }
+        
         thresholds = [
           { min: 8, label: 'Excellent', color: 'text-green-600' },
           { min: 5, label: 'Good', color: 'text-green-500' },
@@ -57,13 +79,28 @@ const PerformanceMetrics = ({ metrics }) => {
           { min: 1, label: 'Below Average', color: 'text-orange-500' },
           { min: 0, label: 'Poor', color: 'text-red-500' }
         ];
-        break;
+        
+        // Find the first threshold where the metric is greater than or equal to the min
+        for (const threshold of thresholds) {
+          if (engagementValue >= threshold.min) {
+            return {
+              score: engagementValue,
+              label: threshold.label,
+              color: threshold.color
+            };
+          }
+        }
+        
+        return { score: engagementValue, label: 'Poor', color: 'text-red-500' };
+        
       case 'costPerView':
         // Lower is better for cost metrics
+        // Remove $ sign and parse as float
         const costPerView = parseFloat(metric.replace('$', ''));
         if (isNaN(costPerView) || costPerView === 0) {
           return { score: 0, label: 'Unknown', color: 'text-gray-500' };
         }
+        
         thresholds = [
           { max: 0.005, label: 'Excellent', color: 'text-green-600' },
           { max: 0.01, label: 'Good', color: 'text-green-500' },
@@ -71,6 +108,7 @@ const PerformanceMetrics = ({ metrics }) => {
           { max: 0.05, label: 'Below Average', color: 'text-orange-500' },
           { max: Infinity, label: 'Poor', color: 'text-red-500' }
         ];
+        
         // Find the first threshold where the cost is less than or equal to the max
         for (const threshold of thresholds) {
           if (costPerView <= threshold.max) {
@@ -81,7 +119,9 @@ const PerformanceMetrics = ({ metrics }) => {
             };
           }
         }
+        
         return { score: costPerView, label: 'Poor', color: 'text-red-500' };
+        
       default:
         thresholds = [
           { min: 5, label: 'Excellent', color: 'text-green-600' },
@@ -90,17 +130,23 @@ const PerformanceMetrics = ({ metrics }) => {
           { min: 1, label: 'Below Average', color: 'text-orange-500' },
           { min: 0, label: 'Poor', color: 'text-red-500' }
         ];
-    }
-    
-    // Find the first threshold where the metric is greater than or equal to the min
-    for (const threshold of thresholds) {
-      if (metric >= threshold.min) {
-        return {
-          score: metric,
-          label: threshold.label,
-          color: threshold.color
-        };
-      }
+        
+        // Ensure metric is a number
+        const numericMetric = parseFloat(metric);
+        if (isNaN(numericMetric)) {
+          return { score: 0, label: 'Unknown', color: 'text-gray-500' };
+        }
+        
+        // Find threshold
+        for (const threshold of thresholds) {
+          if (numericMetric >= threshold.min) {
+            return {
+              score: numericMetric,
+              label: threshold.label,
+              color: threshold.color
+            };
+          }
+        }
     }
     
     return { score: metric, label: 'Poor', color: 'text-red-500' };
@@ -133,9 +179,18 @@ const PerformanceMetrics = ({ metrics }) => {
   const costPerView = calculateCostPerMetric(campaignMetrics.views);
   const costPerViewPerformance = getPerformanceScore(costPerView, 'costPerView');
   
-  // Engagement performance
-  const engagementValue = campaignMetrics.engagement || 0;
-  const engagementPerformance = getPerformanceScore(engagementValue, 'engagement');
+  // Engagement performance - safely handle the engagement value
+  let engagementValue;
+  if (typeof campaignMetrics.engagement === 'number') {
+    engagementValue = campaignMetrics.engagement;
+  } else if (typeof campaignMetrics.engagement === 'string') {
+    engagementValue = parseFloat(campaignMetrics.engagement.replace('%', ''));
+    if (isNaN(engagementValue)) engagementValue = 0;
+  } else {
+    engagementValue = 0;
+  }
+  
+  const engagementPerformance = getPerformanceScore(engagementPercentage, 'engagement');
   
   // Define metrics cards
   const metricCards = [
@@ -271,7 +326,10 @@ PerformanceMetrics.propTypes = {
       comments: PropTypes.number,
       shares: PropTypes.number,
       follows: PropTypes.number,
-      engagement: PropTypes.number
+      engagement: PropTypes.oneOfType([
+        PropTypes.number,
+        PropTypes.string
+      ])
     })
   })
 };
