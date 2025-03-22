@@ -78,20 +78,26 @@ export const getCampaign = async (campaignId) => {
  * @param {string} userId - User ID
  * @returns {Promise<Array>} - Array of campaign objects
  */
+// Make sure this function is properly implemented
 export const getUserCampaigns = async (userId) => {
   try {
     const campaignsRef = collection(db, 'campaigns');
+    // Remove any status filtering - get ALL campaigns for this user
     const q = query(
       campaignsRef, 
       where('userId', '==', userId),
       orderBy('createdAt', 'desc')
     );
     
+    console.log(`Fetching campaigns for user ID: ${userId}`);
     const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({
+    const campaigns = querySnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
     }));
+    
+    console.log(`Found ${campaigns.length} campaigns for user`);
+    return campaigns;
   } catch (error) {
     console.error('Error getting user campaigns:', error);
     throw error;

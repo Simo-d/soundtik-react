@@ -15,11 +15,43 @@ const CampaignStatus = ({ campaign }) => {
     return null;
   }
 
+  // Helper function to safely convert any date format to a JavaScript Date object
+  const safelyGetDate = (dateValue) => {
+    if (!dateValue) return null;
+    
+    try {
+      // Case 1: Firebase Timestamp with toDate method
+      if (dateValue.toDate && typeof dateValue.toDate === 'function') {
+        return dateValue.toDate();
+      }
+      
+      // Case 2: JavaScript Date object
+      if (dateValue instanceof Date) {
+        return dateValue;
+      }
+      
+      // Case 3: String or number timestamp
+      const parsedDate = new Date(dateValue);
+      if (!isNaN(parsedDate.getTime())) {
+        return parsedDate;
+      }
+      
+      // If we can't parse it, log and return null
+      console.warn('Unable to parse date:', dateValue);
+      return null;
+    } catch (error) {
+      console.error('Error parsing date:', error, dateValue);
+      return null;
+    }
+  };
+
   // Format date for display
   const formatDate = (timestamp) => {
     if (!timestamp) return null;
     
-    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    const date = safelyGetDate(timestamp);
+    if (!date) return null;
+    
     return {
       relative: formatDistanceToNow(date, { addSuffix: true }),
       exact: format(date, 'PPP') // e.g., April 29, 2021
@@ -83,10 +115,17 @@ const CampaignStatus = ({ campaign }) => {
       return null;
     }
     
-    const start = campaign.startDate.toDate ? campaign.startDate.toDate() : new Date(campaign.startDate);
-    const end = campaign.endDate 
-      ? campaign.endDate.toDate ? campaign.endDate.toDate() : new Date(campaign.endDate) 
-      : new Date(start.getTime() + (campaign.campaignDetails.duration * 86400000));
+    const start = safelyGetDate(campaign.startDate);
+    if (!start) return null;
+    
+    let end;
+    if (campaign.endDate) {
+      end = safelyGetDate(campaign.endDate);
+      if (!end) return null;
+    } else {
+      const campaignDuration = campaign.campaignDetails?.duration || 30; // Default to 30 if undefined
+      end = new Date(start.getTime() + (campaignDuration * 86400000));
+    }
     
     const now = new Date();
     
@@ -296,7 +335,15 @@ const CampaignStatus = ({ campaign }) => {
               </>
             ) : startDate && campaign.status === 'active' ? (
               <p className="text-sm text-gray-500">
-                Expected to end {formatDate(new Date(startDate.toDate().getTime() + campaign.campaignDetails.duration * 86400000)).relative}
+                {(() => {
+                  const start = safelyGetDate(campaign.startDate);
+                  if (!start) return 'Expected to end when campaign completes';
+                  
+                  const campaignDuration = campaign.campaignDetails?.duration || 30;
+                  const endDate = new Date(start.getTime() + (campaignDuration * 86400000));
+                  const formattedDate = formatDate(endDate);
+                  return `Expected to end ${formattedDate?.relative || 'when campaign completes'}`;
+                })()}
               </p>
             ) : (
               <p className="text-sm text-gray-500">Not yet completed</p>
@@ -336,17 +383,59 @@ const CampaignStatus = ({ campaign }) => {
 const calculateProgress = (campaign) => {
   if (!campaign.startDate) return 0;
   
-  const start = campaign.startDate.toDate ? campaign.startDate.toDate() : new Date(campaign.startDate);
-  const end = campaign.endDate 
-    ? campaign.endDate.toDate ? campaign.endDate.toDate() : new Date(campaign.endDate) 
-    : new Date(start.getTime() + (campaign.campaignDetails.duration * 86400000));
+  const start = safelyGetDate(campaign.startDate);
+  if (!start) return 0;
+  
+  let end;
+  if (campaign.endDate) {
+    end = safelyGetDate(campaign.endDate);
+    if (!end) {
+      const campaignDuration = campaign.campaignDetails?.duration || 30;
+      end = new Date(start.getTime() + (campaignDuration * 86400000));
+    }
+  } else {
+    const campaignDuration = campaign.campaignDetails?.duration || 30;
+    end = new Date(start.getTime() + (campaignDuration * 86400000));
+  }
   
   const now = new Date();
   const totalDuration = end.getTime() - start.getTime();
+  if (totalDuration <= 0) return 0;
+  
   const elapsed = now.getTime() - start.getTime();
   
   return Math.max(0, Math.min(100, Math.round((elapsed / totalDuration) * 100)));
 };
+
+// Add the safelyGetDate helper function to the global scope
+function safelyGetDate(dateValue) {
+  if (!dateValue) return null;
+  
+  try {
+    // Case 1: Firebase Timestamp with toDate method
+    if (dateValue.toDate && typeof dateValue.toDate === 'function') {
+      return dateValue.toDate();
+    }
+    
+    // Case 2: JavaScript Date object
+    if (dateValue instanceof Date) {
+      return dateValue;
+    }
+    
+    // Case 3: String or number timestamp
+    const parsedDate = new Date(dateValue);
+    if (!isNaN(parsedDate.getTime())) {
+      return parsedDate;
+    }
+    
+    // If we can't parse it, log and return null
+    console.warn('Unable to parse date:', dateValue);
+    return null;
+  } catch (error) {
+    console.error('Error parsing date:', error, dateValue);
+    return null;
+  }
+}
 
 CampaignStatus.propTypes = {
   campaign: PropTypes.shape({
