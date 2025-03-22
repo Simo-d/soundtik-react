@@ -5,7 +5,7 @@ import { PayPalButtons } from '@paypal/react-paypal-js';
 import { useFormContext } from '../../contexts/FormContext';
 import { useCampaign } from '../../hooks/useCampaign';
 import { useAuth } from '../../hooks/useAuth';
-import { createCampaign } from '../../firebase/firestore';
+import { createCampaign, submitCampaign } from '../../firebase/firestore';
 import { logPayment, logFormStepComplete } from '../../firebase/analytics';
 import Button from '../common/Button';
 
@@ -109,6 +109,9 @@ const PaymentForm = ({ onBack }) => {
       // Simulate payment processing
       await new Promise(resolve => setTimeout(resolve, 2000));
       
+      // Update campaign status to pending after successful payment
+      await submitCampaign(newCampaignId);
+      
       // Simulate success
       setPaymentSuccess(true);
       logFormStepComplete('campaign_creation', 3, 'payment');
@@ -124,7 +127,7 @@ const PaymentForm = ({ onBack }) => {
       console.error('Payment error:', error);
       setPaymentError(error.message || 'An error occurred during payment processing');
     } finally {
-      setIsProcessing(false);
+      setIsProcessing(false); // Fixed from setIsSubmitting(false)
     }
   };
   
@@ -147,6 +150,9 @@ const PaymentForm = ({ onBack }) => {
       if (!newCampaignId) {
         throw new Error('Failed to create campaign');
       }
+      
+      // Update campaign status to pending after successful payment
+      await submitCampaign(newCampaignId);
       
       // Handle successful payment
       setPaymentSuccess(true);

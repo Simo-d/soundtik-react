@@ -49,7 +49,7 @@ const AdminPanel = () => {
   const [activeCampaigns, setActiveCampaigns] = useState([]);
   const [selectedCampaign, setSelectedCampaign] = useState(null);
   const [campaignVideos, setCampaignVideos] = useState([]);
-  const [activeTab, setActiveTab] = useState('pending'); // 'pending' or 'active'
+  const [activeTab, setActiveTab] = useState('pending'); // 'pending', 'active', or 'drafts'
   
   // State for adding videos
   const [showAddVideoModal, setShowAddVideoModal] = useState(false);
@@ -80,23 +80,49 @@ const AdminPanel = () => {
         setError(null);
       } catch (err) {
         console.error('Error loading pending campaigns:', err);
-        
-        // Specific handling for permission errors
-        if (err.message.includes('Missing or insufficient permissions')) {
-          setError(
-            'Permission error: Your Firestore security rules are preventing admin access. ' +
-            'Please update your security rules to allow admin users to read all campaigns.'
-          );
-        } else {
-          setError('Failed to load campaigns: ' + err.message);
-        }
+        setError('Failed to load campaigns: ' + err.message);
       } finally {
         setLoading(false);
       }
     };
     
-    if (currentUser && isAdmin && activeTab === 'pending') {
-      loadPendingCampaigns();
+    const loadActiveCampaigns = async () => {
+      try {
+        setLoading(true);
+        // Get campaigns with status 'active'
+        const campaignsRef = await getActiveCampaigns();
+        setActiveCampaigns(campaignsRef);
+        setError(null);
+      } catch (err) {
+        console.error('Error loading active campaigns:', err);
+        setError('Failed to load active campaigns: ' + err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+  
+    const loadDraftCampaigns = async () => {
+      try {
+        setLoading(true);
+        const campaigns = await getDraftCampaigns();
+        setPendingCampaigns(campaigns); // Reusing the same state variable for simplicity
+        setError(null);
+      } catch (err) {
+        console.error('Error loading draft campaigns:', err);
+        setError('Failed to load draft campaigns: ' + err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    if (currentUser && isAdmin) {
+      if (activeTab === 'pending') {
+        loadPendingCampaigns();
+      } else if (activeTab === 'drafts') {
+        loadDraftCampaigns();
+      } else if (activeTab === 'active') {
+        loadActiveCampaigns();
+      }
     }
   }, [currentUser, isAdmin, activeTab]);
   
@@ -184,6 +210,28 @@ const AdminPanel = () => {
       setError('Failed to approve campaign: ' + err.message);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+  
+  // Add this function to get draft campaigns
+  const getDraftCampaigns = async (limitCount = 20) => {
+    try {
+      const campaignsRef = collection(db, 'campaigns');
+      const q = query(
+        campaignsRef,
+        where('status', '==', 'draft'),
+        orderBy('createdAt', 'desc'),
+        limit(limitCount)
+      );
+      
+      const querySnapshot = await getDocs(q);
+      return querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+    } catch (error) {
+      console.error('Error getting draft campaigns:', error);
+      throw error;
     }
   };
   
@@ -391,6 +439,16 @@ const AdminPanel = () => {
           <div className="flex">
             <button
               className={`px-4 py-2 font-medium text-sm ${
+                activeTab === 'drafts'
+                  ? 'border-b-2 border-primary text-primary'
+                  : 'text-gray-600 hover:text-gray-800'
+              }`}
+              onClick={() => setActiveTab('drafts')}
+            >
+              Draft Campaigns
+            </button>
+            <button
+              className={`px-4 py-2 font-medium text-sm ${
                 activeTab === 'pending'
                   ? 'border-b-2 border-primary text-primary'
                   : 'text-gray-600 hover:text-gray-800'
@@ -413,12 +471,18 @@ const AdminPanel = () => {
         </div>
         
         {/* Pending Campaigns Tab */}
-        {activeTab === 'pending' && (
+        {(activeTab === 'pending' || activeTab === 'drafts') && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Left Column - Pending Campaigns List */}
             <div className="lg:col-span-1">
               <div className="bg-white rounded-lg shadow-md p-6">
-                <h2 className="text-xl font-bold mb-4">Pending Campaigns</h2>
+                <h2 className="text-xl font-bold mb-4">
+                  {activeTab === 'drafts' 
+                    ? 'Draft Campaigns' 
+                    : activeTab === 'pending' 
+                      ? 'Pending Campaigns' 
+                      : 'Active Campaigns'}
+                </h2>
                 
                 {loading ? (
                   <div className="py-10 text-center">
@@ -446,7 +510,7 @@ const AdminPanel = () => {
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-gray-400 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    <p className="text-gray-600">No pending campaigns to review.</p>
+                    <p className="text-gray-600">No {activeTab === 'drafts' ? 'draft' : 'pending'} campaigns to review.</p>
                   </div>
                 )}
               </div>
@@ -469,7 +533,7 @@ const AdminPanel = () => {
                       <div className="flex justify-between items-start mb-6">
                         <h2 className="text-xl font-bold">Campaign Review</h2>
                         <div className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-medium">
-                          Pending Approval
+                          {activeTab === 'drafts' ? 'Draft' : 'Pending Approval'}
                         </div>
                       </div>
                       
@@ -663,7 +727,7 @@ const AdminPanel = () => {
                   </svg>
                   <h3 className="text-xl font-medium mb-2">No Campaign Selected</h3>
                   <p className="text-gray-500">
-                    Select a pending campaign from the list to review it.
+                    Select a {activeTab === 'drafts' ? 'draft' : 'pending'} campaign from the list to review it.
                   </p>
                 </div>
               )}

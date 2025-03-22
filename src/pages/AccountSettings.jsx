@@ -31,6 +31,24 @@ const AccountSettings = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [updateSuccess, setUpdateSuccess] = useState(false);
   
+  // Debug logging
+  useEffect(() => {
+    console.log('AccountSettings rendered with:', {
+      userLoggedIn: !!currentUser,
+      userId: currentUser?.uid,
+      campaignsLoading: loading,
+      campaignsCount: campaigns?.length
+    });
+    
+    if (campaigns?.length > 0) {
+      console.log('First campaign:', {
+        id: campaigns[0].id,
+        status: campaigns[0].status,
+        title: campaigns[0].songDetails?.title
+      });
+    }
+  }, [currentUser, campaigns, loading]);
+  
   // Track page view
   useEffect(() => {
     logPageView('Account Settings');
@@ -51,6 +69,7 @@ const AccountSettings = () => {
   // Load campaigns
   useEffect(() => {
     if (currentUser) {
+      console.log('Triggering campaign refresh');
       refreshCampaigns();
     }
   }, [currentUser, refreshCampaigns]);
@@ -151,7 +170,14 @@ const AccountSettings = () => {
   
   // View campaign details
   const handleViewCampaign = (campaignId) => {
+    console.log('Navigating to campaign details:', campaignId);
     navigate(`/campaign/${campaignId}`);
+  };
+  
+  // Force campaigns refresh
+  const handleRefreshCampaigns = () => {
+    console.log('Manual refresh triggered');
+    refreshCampaigns();
   };
   
   return (
@@ -347,13 +373,29 @@ const AccountSettings = () => {
                 <div className="flex justify-between items-center mb-6">
                   <h2 className="text-xl font-bold">Your Campaigns</h2>
                   
-                  <Button
-                    type="button"
-                    variant="primary"
-                    onClick={() => navigate('/create-campaign')}
-                  >
-                    New Campaign
-                  </Button>
+                  <div className="flex gap-2">
+                    {/* Added refresh button for debugging */}
+                    {process.env.NODE_ENV === 'development' && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleRefreshCampaigns}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        Refresh
+                      </Button>
+                    )}
+                    
+                    <Button
+                      type="button"
+                      variant="primary"
+                      onClick={() => navigate('/create-campaign')}
+                    >
+                      New Campaign
+                    </Button>
+                  </div>
                 </div>
                 
                 {loading ? (
@@ -361,15 +403,20 @@ const AccountSettings = () => {
                     <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                     <p className="mt-2 text-gray-500">Loading your campaigns...</p>
                   </div>
-                ) : campaigns.length > 0 ? (
+                ) : campaigns && campaigns.length > 0 ? (
                   <div className="grid md:grid-cols-2 gap-6">
-                    {campaigns.map(campaign => (
-                      <CampaignSummary 
-                        key={campaign.id} 
-                        campaign={campaign}
-                        onViewDetails={handleViewCampaign}
-                      />
-                    ))}
+                    {campaigns.map(campaign => {
+                      // Log each campaign for debugging
+                      console.log('Rendering campaign:', campaign.id, campaign);
+                      
+                      return (
+                        <CampaignSummary 
+                          key={campaign.id} 
+                          campaign={campaign}
+                          onViewDetails={handleViewCampaign}
+                        />
+                      );
+                    })}
                   </div>
                 ) : (
                   <div className="py-10 text-center">
@@ -384,6 +431,17 @@ const AccountSettings = () => {
                     >
                       Create Your First Campaign
                     </Button>
+                  </div>
+                )}
+                
+                {/* Add campaign count for debugging */}
+                {process.env.NODE_ENV === 'development' && (
+                  <div className="mt-4 text-xs text-gray-500 border-t pt-2">
+                    {loading ? 'Loading campaigns...' : 
+                      campaigns ? 
+                        `${campaigns.length} campaign(s) found` : 
+                        'No campaigns array'
+                    }
                   </div>
                 )}
               </div>
